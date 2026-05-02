@@ -105,17 +105,27 @@ Print the Claude MCP configuration snippet for the unified MCP server.
 backpack-connector mcp-config [--name backpack] [--adapter arcadedb]
 ```
 
-Output goes directly into `~/.claude/settings.json`. This server includes all 86+ backpack-ontology tools plus `connector_project`, `connector_query`, `connector_schema`, and `connector_status`.
+Output goes directly into `~/.claude/settings.json`. This server includes all backpack-ontology tools plus the connector tools listed below.
 
 ## Unified MCP server
 
-The MCP server (`backpack-connector-mcp`) is the recommended way to use this package with Claude. It runs one server process that exposes:
+The MCP server (`backpack-connector-mcp`) is the recommended way to use this package with Claude. It runs one server process that exposes all backpack-ontology tools (graph management, KB, signals, mining, sync, etc.) plus:
 
-- All backpack-ontology tools (graph management, KB, signals, mining, sync, etc.)
-- `connector_project` — project a graph from inside a conversation
-- `connector_query` — run Cypher/SQL from inside a conversation
-- `connector_schema` — inspect schema from inside a conversation
-- `connector_status` — check projection state from inside a conversation
+**Graph projection:**
+- `connector_project` — project a learning graph into ArcadeDB
+- `connector_query` — run Cypher/SQL against a projected graph
+- `connector_schema` — inspect schema and projection state
+- `connector_status` — check projection progress
+
+**Cross-graph synthesis:**
+- `connector_synthesize` — merge N graphs into a unified learning graph via ArcadeDB UNION
+- `connector_signals` — detect entities appearing in multiple graphs (cross-graph duplicate report)
+- `connector_signal_detect` — run ArcadeDB-powered signal detectors (centrality hubs, type drift, community bridges) and merge results into the Signals panel
+
+**Signals panel customization:**
+- `connector_signals_show` — read the current Signals panel widget layout
+- `connector_signals_add_widget` — add or update a widget (Claude writes the config, panel hot-reloads in 3s)
+- `connector_signals_remove_widget` — remove a widget by id
 
 **Claude Code** (`~/.claude/settings.json`):
 
