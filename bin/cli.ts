@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import * as path from "node:path";
+import * as fs from "node:fs";
 import { getActiveBackpack } from "backpack-ontology/connector";
 import { createAdapter } from "../src/adapter-factory.js";
 import { project } from "../src/projector.js";
@@ -236,6 +237,7 @@ Optional:
   --branch <branch>        Source branch (default: main)
   --adapter <name>         Adapter (default: arcadedb)
   --reset                  Overwrite output graph if it exists
+  --filter <clause>        Cypher WHERE clause to filter nodes, e.g. "n:Platform OR n:API"
   --no-project             Skip projecting source graphs (use existing projections)
 
 Example:
@@ -270,6 +272,7 @@ Example:
       branch: str(args["branch"]),
       reset: args["reset"] === true,
       projectFirst: args["no-project"] !== true,
+      filter: str(args["filter"]),
     },
     (msg) => process.stdout.write(`  ${msg}\n`),
   );
@@ -320,6 +323,31 @@ async function cmdSignals(args: Record<string, string | boolean>): Promise<void>
   }
 }
 
+// ─── install-extension ───────────────────────────────────────────────────────
+
+async function cmdInstallExtension(): Promise<void> {
+  const srcDir = path.resolve(
+    path.dirname(new URL(import.meta.url).pathname),
+    "../extensions/connector",
+  );
+  const configBase = process.env.XDG_CONFIG_HOME ?? path.join(process.env.HOME ?? "~", ".config");
+  const destDir = path.join(configBase, "backpack", "extensions", "connector");
+
+  if (!await fs.promises.access(srcDir).then(() => true).catch(() => false)) {
+    process.stderr.write(`Error: extension source not found at ${srcDir}\n`);
+    process.exit(1);
+  }
+
+  await fs.promises.mkdir(destDir, { recursive: true });
+  for (const file of await fs.promises.readdir(srcDir)) {
+    await fs.promises.copyFile(path.join(srcDir, file), path.join(destDir, file));
+  }
+
+  process.stdout.write(`Installed connector viewer extension to ${destDir}\n`);
+  process.stdout.write(`Restart the viewer (npx backpack-viewer) to activate it.\n`);
+  process.stdout.write(`The "Query" button will appear in the viewer's taskbar.\n`);
+}
+
 // ─── mcp-config ──────────────────────────────────────────────────────────────
 
 async function cmdMcpConfig(args: Record<string, string | boolean>): Promise<void> {
@@ -363,12 +391,13 @@ Usage: backpack-connector <command> [options]
 
 Commands:
   project     Project a learning graph into the connected graph database
-  synthesize  Combine multiple graphs into a unified view via ArcadeDB UNION
-  signals     Detect entities appearing in multiple graphs (cross-graph duplicates)
-  query       Run Cypher or SQL against a projected graph
-  schema      Show schema for a projected graph
-  daemon      Watch for new events and project them continuously
-  mcp-config  Print Claude MCP server configuration (unified backpack + connector)
+  synthesize          Combine multiple graphs into a unified view via ArcadeDB UNION
+  signals             Detect entities appearing in multiple graphs
+  query               Run Cypher or SQL against a projected graph
+  schema              Show schema for a projected graph
+  daemon              Watch for new events and project them continuously
+  install-extension   Install the Query panel into the Backpack viewer
+  mcp-config          Print Claude MCP server configuration
 
 Run backpack-connector <command> with no args for command-specific help.
 `);
@@ -383,9 +412,10 @@ async function main(): Promise<void> {
     case "query":      return cmdQuery(args);
     case "schema":     return cmdSchema(args);
     case "daemon":     return cmdDaemon(args);
-    case "synthesize": return cmdSynthesize(args);
-    case "signals":    return cmdSignals(args);
-    case "mcp-config": return cmdMcpConfig(args);
+    case "synthesize":        return cmdSynthesize(args);
+    case "signals":           return cmdSignals(args);
+    case "install-extension": return cmdInstallExtension();
+    case "mcp-config":        return cmdMcpConfig(args);
     default:
       globalUsage();
       if (subcommand) process.exit(1);

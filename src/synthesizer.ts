@@ -11,6 +11,7 @@ export interface SynthesizeOptions {
   branch?: string;
   reset?: boolean;
   projectFirst?: boolean;
+  filter?: string; // Cypher WHERE clause applied to nodes, e.g. "n:Platform OR n:API"
 }
 
 export interface SynthesizeResult {
@@ -69,8 +70,9 @@ function rowToEdge(row: Record<string, unknown>): Edge | null {
   };
 }
 
-async function queryVertices(adapter: ConnectorAdapter, database: string): Promise<Node[]> {
-  const rows = await adapter.execute(database, "opencypher", "MATCH (n) WHERE n.bk_id IS NOT NULL RETURN n");
+async function queryVertices(adapter: ConnectorAdapter, database: string, filter?: string): Promise<Node[]> {
+  const where = filter ? `n.bk_id IS NOT NULL AND (${filter})` : "n.bk_id IS NOT NULL";
+  const rows = await adapter.execute(database, "opencypher", `MATCH (n) WHERE ${where} RETURN n`);
   return rows.flatMap((r) => {
     const node = rowToNode((r.n ?? r) as Record<string, unknown>);
     return node ? [node] : [];
@@ -118,8 +120,13 @@ export async function synthesize(
       continue;
     }
     onProgress?.(`Reading "${graph}" from ${adapter.name}...`);
-    for (const node of await queryVertices(adapter, database)) allNodes.set(node.id, node);
-    for (const edge of await queryEdges(adapter, database)) allEdges.set(edge.id, edge);
+    for (const node of await queryVertices(adapter, database, options.filter)) allNodes.set(node.id, node);
+    for (const edge of await queryEdges(adapter, database)) {
+      // Only include edges where both endpoints survived the node filter
+      if (allNodes.has(edge.sourceId) && allNodes.has(edge.targetId)) {
+        allEdges.set(edge.id, edge);
+      }
+    }
   }
 
   const now = new Date().toISOString();

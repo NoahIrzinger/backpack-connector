@@ -117,9 +117,13 @@ export function registerConnectorTools(server: McpServer, adapter: ConnectorAdap
         branch: z.string().optional().describe("Branch to read from (default: main)"),
         reset: z.boolean().optional().describe("Overwrite the output graph if it already exists"),
         projectFirst: z.boolean().optional().describe("Project source graphs before synthesizing (default: true)"),
+        filter: z.string().optional().describe(
+          "Cypher WHERE clause to filter which nodes are included, e.g. \"n:Platform OR n:API\". " +
+          "Only nodes matching this filter are synthesized. Edges are included only when both endpoints match."
+        ),
       },
     },
-    async ({ graphs, into, backpackPath, branch, reset, projectFirst }) => {
+    async ({ graphs, into, backpackPath, branch, reset, projectFirst, filter }) => {
       try {
         if (graphs.length < 2) {
           return { content: [{ type: "text" as const, text: "Error: provide at least 2 graphs to synthesize." }] };
@@ -127,7 +131,7 @@ export function registerConnectorTools(server: McpServer, adapter: ConnectorAdap
         const resolvedPath = await resolveBackpackPath(backpackPath);
         const result = await synthesize(
           adapter,
-          { backpackPath: resolvedPath, graphs, into, branch, reset, projectFirst },
+          { backpackPath: resolvedPath, graphs, into, branch, reset, projectFirst, filter: filter ?? undefined },
           (msg) => process.stderr.write(msg + "\n"),
         );
         const text =

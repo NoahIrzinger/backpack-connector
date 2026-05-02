@@ -1,0 +1,13 @@
+{
+  "name": "connector",
+  "version": "0.1.0",
+  "viewerApi": "1",
+  "displayName": "Graph Query",
+  "description": "Query projected learning graphs with Cypher or SQL directly from the viewer",
+  "entry": "index.js",
+  "stylesheet": "index.css",
+  "permissions": {
+    "viewer": ["focus"],
+    "settings": true
+  }
+}
