@@ -7,6 +7,8 @@ import { sanitizeDatabaseName } from "../database-name.js";
 import { synthesize } from "../synthesizer.js";
 import { detectCrossGraphSignals } from "../cross-graph-signals.js";
 import { runConnectorSignals } from "../connector-signals.js";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 
 async function resolveBackpackPath(provided?: string): Promise<string> {
   if (provided) return provided;
@@ -202,6 +204,99 @@ export function registerConnectorTools(server: McpServer, adapter: ConnectorAdap
             result.signals.slice(0, 5).map((s) => `• [${s.severity.toUpperCase()}] ${s.title}`).join("\n") +
             (result.signals.length > 5 ? `\n... and ${result.signals.length - 5} more` : "");
         return { content: [{ type: "text" as const, text }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }] };
+      }
+    },
+  );
+
+  server.registerTool(
+    "connector_signals_show",
+    {
+      title: "Show Signals Panel Layout",
+      description:
+        `Read the current Signals panel widget layout from the active backpack. ` +
+        `Returns the full SignalsViewSpec JSON so you can see what widgets exist before adding or updating one. ` +
+        `Use connector_signals_add_widget to add or update a widget, connector_signals_remove_widget to remove one.`,
+      inputSchema: {
+        backpackPath: z.string().optional().describe("Backpack directory (uses active backpack if omitted)"),
+      },
+    },
+    async ({ backpackPath }) => {
+      try {
+        const bp = await resolveBackpackPath(backpackPath);
+        const filePath = path.join(bp, "signals-view.json");
+        let spec: unknown = null;
+        try { spec = JSON.parse(await fs.readFile(filePath, "utf8")); } catch { /* not configured yet */ }
+        return { content: [{ type: "text" as const, text: JSON.stringify(spec, null, 2) }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }] };
+      }
+    },
+  );
+
+  server.registerTool(
+    "connector_signals_add_widget",
+    {
+      title: "Add or Update a Signals Panel Widget",
+      description:
+        `Add a new widget or update an existing widget in the Signals panel. ` +
+        `The panel hot-reloads within 3 seconds of this call. ` +
+        `Widget types: stat-card, signal-cards, bar-chart, stacked-bar, line-chart, pie-chart, table. ` +
+        `Position uses 1-based CSS grid: { col, row, colSpan, rowSpan }. Default grid is 3 columns. ` +
+        `Query sources: "signals" (groupBy: kind|severity|category|graphNames) or "graphs" (groupBy: graphName|nodeType|edgeType). ` +
+        `If the widget id already exists it will be replaced.`,
+      inputSchema: {
+        widget: z.object({
+          id: z.string().describe("Unique widget id"),
+          type: z.enum(["stat-card","signal-cards","bar-chart","stacked-bar","line-chart","pie-chart","table"]),
+          title: z.string().describe("Widget header title"),
+          position: z.object({ col: z.number(), row: z.number(), colSpan: z.number(), rowSpan: z.number() }),
+          config: z.record(z.unknown()).describe("Widget-specific configuration"),
+        }).describe("Full widget specification"),
+        backpackPath: z.string().optional(),
+      },
+    },
+    async ({ widget, backpackPath }) => {
+      try {
+        const bp = await resolveBackpackPath(backpackPath);
+        const filePath = path.join(bp, "signals-view.json");
+        let spec: { version: 1; grid: { columns: number; rowHeight: number; gap: number }; widgets: unknown[] } = {
+          version: 1, grid: { columns: 3, rowHeight: 200, gap: 12 }, widgets: [],
+        };
+        try { spec = JSON.parse(await fs.readFile(filePath, "utf8")); } catch { /* first widget */ }
+        const existing = spec.widgets as { id: string }[];
+        const idx = existing.findIndex((w) => w.id === widget.id);
+        if (idx >= 0) existing.splice(idx, 1, widget);
+        else existing.push(widget);
+        await fs.writeFile(filePath, JSON.stringify(spec, null, 2), "utf8");
+        return { content: [{ type: "text" as const, text: `Widget "${widget.id}" saved. Signals panel will update within 3 seconds.` }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }] };
+      }
+    },
+  );
+
+  server.registerTool(
+    "connector_signals_remove_widget",
+    {
+      title: "Remove a Signals Panel Widget",
+      description: "Remove a widget from the Signals panel by its id.",
+      inputSchema: {
+        id: z.string().describe("Widget id to remove"),
+        backpackPath: z.string().optional(),
+      },
+    },
+    async ({ id, backpackPath }) => {
+      try {
+        const bp = await resolveBackpackPath(backpackPath);
+        const filePath = path.join(bp, "signals-view.json");
+        const spec = JSON.parse(await fs.readFile(filePath, "utf8")) as { widgets: { id: string }[] };
+        const before = spec.widgets.length;
+        spec.widgets = spec.widgets.filter((w) => w.id !== id);
+        await fs.writeFile(filePath, JSON.stringify(spec, null, 2), "utf8");
+        const removed = before - spec.widgets.length;
+        return { content: [{ type: "text" as const, text: removed > 0 ? `Widget "${id}" removed.` : `Widget "${id}" not found.` }] };
       } catch (e) {
         return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }] };
       }

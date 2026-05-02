@@ -13,9 +13,9 @@ async function openDashboard(p: Page): Promise<void> {
   await p.waitForSelector(".sidebar-tab");
   await p.evaluate(() => {
     const btns = Array.from(document.querySelectorAll<HTMLButtonElement>(".sidebar-tab"));
-    btns.find((b) => b.textContent?.includes("Dashboard"))?.click();
+    btns.find((b) => b.textContent?.includes("Signals"))?.click();
   });
-  await p.waitForSelector(".dash-panel-root", { timeout: 8000 });
+  await p.waitForSelector(".sv-panel-root", { timeout: 8000 });
   await new Promise((r) => setTimeout(r, 1500)); // let widgets render
 }
 
@@ -34,50 +34,54 @@ afterAll(async () => {
   await browser?.close();
 });
 
-describe("dashboard tab", () => {
-  it("Dashboard tab is visible in the sidebar", async () => {
+describe("signals tab", () => {
+  it("Signals tab is visible in the sidebar", async () => {
     await page.goto(VIEWER_URL, { waitUntil: "networkidle0" });
     await page.waitForSelector(".sidebar-tab");
     const tab = await page.evaluate(() =>
       Array.from(document.querySelectorAll(".sidebar-tab"))
-        .find((b) => b.textContent?.includes("Dashboard"))?.textContent?.trim() ?? null
+        .find((b) => b.textContent?.includes("Signals"))?.textContent?.trim() ?? null
     );
-    expect(tab).toBe("Dashboard");
+    expect(tab).toBe("Signals");
   });
 
-  it("Signals tab is gone — replaced by Dashboard", async () => {
-    const signalsTab = await page.evaluate(() =>
-      Array.from(document.querySelectorAll(".sidebar-tab"))
-        .some((b) => b.textContent?.trim() === "Signals")
-    );
-    expect(signalsTab).toBe(false);
-  });
-
-  it("Sidebar dashboard pane shows stat numbers and Open Dashboard button", async () => {
+  it("Signals tab opens the widget-based panel, not a flat list", async () => {
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll<HTMLButtonElement>(".sidebar-tab"));
-      btns.find((b) => b.textContent?.includes("Dashboard"))?.click();
+      btns.find((b) => b.textContent?.includes("Signals"))?.click();
     });
-    await page.waitForSelector(".dash-open-btn", { timeout: 5000 });
-    const btnText = await page.$eval(".dash-open-btn", (el) => el.textContent?.trim());
-    expect(btnText).toBe("Open Dashboard");
-    const statsVisible = await page.$$eval(".dash-sidebar-stat", (els) => els.length);
+    await new Promise((r) => setTimeout(r, 2500));
+    const hasWidgets = await page.evaluate(() => document.querySelectorAll(".sv-widget").length > 0);
+    expect(hasWidgets).toBe(true);
+    const hasOldFlatList = await page.evaluate(() => !!document.querySelector(".signals-sidebar-list"));
+    expect(hasOldFlatList).toBe(false);
+  });
+
+  it("Sidebar signals pane shows stat numbers and Open Signals button", async () => {
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll<HTMLButtonElement>(".sidebar-tab"));
+      btns.find((b) => b.textContent?.includes("Signals"))?.click();
+    });
+    await page.waitForSelector(".sv-open-btn", { timeout: 5000 });
+    const btnText = await page.$eval(".sv-open-btn", (el) => el.textContent?.trim());
+    expect(btnText).toBe("Open Signals");
+    const statsVisible = await page.$$eval(".sv-sidebar-stat", (els) => els.length);
     expect(statsVisible).toBe(2);
   });
 });
 
-describe("dashboard panel", () => {
+describe("signals panel", () => {
   beforeAll(async () => {
     await openDashboard(page);
   });
 
-  it("panel mounts with dash-panel-root", async () => {
-    const mounted = await page.$(".dash-panel-root");
+  it("panel mounts with sv-panel-root", async () => {
+    const mounted = await page.$(".sv-panel-root");
     expect(mounted).not.toBeNull();
   });
 
   it("toolbar renders with Detect and Refresh buttons", async () => {
-    const buttons = await page.$$eval(".dash-toolbar-btn", (els) =>
+    const buttons = await page.$$eval(".sv-toolbar-btn", (els) =>
       els.map((el) => el.textContent?.trim())
     );
     expect(buttons).toContain("Detect signals");
@@ -85,17 +89,17 @@ describe("dashboard panel", () => {
   });
 
   it("grid renders 6 widgets from the default dashboard spec", async () => {
-    const count = await page.$$eval(".dash-widget", (els) => els.length);
+    const count = await page.$$eval(".sv-widget", (els) => els.length);
     expect(count).toBe(6);
   });
 
   it("3 stat cards render", async () => {
-    const count = await page.$$eval(".dash-stat-body", (els) => els.length);
+    const count = await page.$$eval(".sv-stat-body", (els) => els.length);
     expect(count).toBe(3);
   });
 
   it("stat cards show numeric values (not empty)", async () => {
-    const numbers = await page.$$eval(".dash-stat-number", (els) =>
+    const numbers = await page.$$eval(".sv-stat-number", (els) =>
       els.map((el) => el.textContent?.trim())
     );
     expect(numbers.length).toBe(3);
@@ -105,7 +109,7 @@ describe("dashboard panel", () => {
   });
 
   it("stat card titles are correct", async () => {
-    const titles = await page.$$eval(".dash-widget-title", (els) =>
+    const titles = await page.$$eval(".sv-widget-title", (els) =>
       els.map((el) => el.textContent?.trim())
     );
     // CSS text-transform: uppercase is visual only — textContent returns source case
@@ -115,23 +119,23 @@ describe("dashboard panel", () => {
   });
 
   it("2 chart bodies render (bar-chart + pie-chart)", async () => {
-    const count = await page.$$eval(".dash-chart-body", (els) => els.length);
+    const count = await page.$$eval(".sv-chart-body", (els) => els.length);
     expect(count).toBe(2);
   });
 
   it("ECharts canvas elements rendered inside chart bodies", async () => {
     await new Promise((r) => setTimeout(r, 500));
-    const canvasCount = await page.$$eval(".dash-chart-body canvas", (els) => els.length);
+    const canvasCount = await page.$$eval(".sv-chart-body canvas", (els) => els.length);
     expect(canvasCount).toBeGreaterThanOrEqual(1);
   });
 
   it("signal-cards widget renders with search input", async () => {
-    const searchInput = await page.$(".dash-signals-search");
+    const searchInput = await page.$(".sv-signals-search");
     expect(searchInput).not.toBeNull();
   });
 
   it("widget positions use CSS grid-column and grid-row", async () => {
-    const gridColumns = await page.$$eval(".dash-widget", (els) =>
+    const gridColumns = await page.$$eval(".sv-widget", (els) =>
       els.map((el) => (el as HTMLElement).style.gridColumn).filter(Boolean)
     );
     expect(gridColumns.length).toBeGreaterThan(0);
@@ -141,7 +145,7 @@ describe("dashboard panel", () => {
   });
 
   it("widget backgrounds use CSS variable (not hardcoded)", async () => {
-    const bg = await page.$eval(".dash-widget", (el) =>
+    const bg = await page.$eval(".sv-widget", (el) =>
       getComputedStyle(el).backgroundColor
     );
     // Should not be pure white — must be using --bg-surface
@@ -161,7 +165,7 @@ describe("theme switching", () => {
     await new Promise((r) => setTimeout(r, 600));
 
     // Charts should still be present
-    const canvasCount = await page.$$eval(".dash-chart-body canvas", (els) => els.length);
+    const canvasCount = await page.$$eval(".sv-chart-body canvas", (els) => els.length);
     expect(canvasCount).toBeGreaterThanOrEqual(1);
 
     // No JS errors from theme change
@@ -175,12 +179,12 @@ describe("theme switching", () => {
   });
 
   it("widget backgrounds change between dark and light", async () => {
-    const darkBg = await page.$eval(".dash-widget", (el) =>
+    const darkBg = await page.$eval(".sv-widget", (el) =>
       getComputedStyle(el).backgroundColor
     );
     await page.evaluate(() => { document.documentElement.dataset.theme = "light"; });
     await new Promise((r) => setTimeout(r, 300));
-    const lightBg = await page.$eval(".dash-widget", (el) =>
+    const lightBg = await page.$eval(".sv-widget", (el) =>
       getComputedStyle(el).backgroundColor
     );
     expect(darkBg).not.toBe(lightBg);
@@ -189,9 +193,9 @@ describe("theme switching", () => {
 });
 
 describe("hot reload", () => {
-  it("PUT /api/dashboard updates the spec on the server", async () => {
+  it("PUT /api/signals/view updates the spec on the server", async () => {
     const res = await page.evaluate(async () => {
-      const r = await fetch("/api/dashboard", {
+      const r = await fetch("/api/signals/view", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -214,10 +218,10 @@ describe("hot reload", () => {
     // Wait for poll interval (3s) + render time
     await new Promise((r) => setTimeout(r, 4000));
 
-    const widgetCount = await page.$$eval(".dash-widget", (els) => els.length);
+    const widgetCount = await page.$$eval(".sv-widget", (els) => els.length);
     expect(widgetCount).toBe(2);
 
-    const titles = await page.$$eval(".dash-widget-title", (els) =>
+    const titles = await page.$$eval(".sv-widget-title", (els) =>
       els.map((el) => el.textContent?.trim())
     );
     expect(titles).toContain("Test");
@@ -225,7 +229,7 @@ describe("hot reload", () => {
 
   it("restoring default dashboard.json reverts to 6 widgets", async () => {
     const res = await page.evaluate(async () => {
-      const r = await fetch("/api/dashboard", { method: "PUT",
+      const r = await fetch("/api/signals/view", { method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           version: 1,
@@ -258,7 +262,7 @@ describe("hot reload", () => {
 
     await new Promise((r) => setTimeout(r, 4000));
 
-    const widgetCount = await page.$$eval(".dash-widget", (els) => els.length);
+    const widgetCount = await page.$$eval(".sv-widget", (els) => els.length);
     expect(widgetCount).toBe(6);
   });
 });
