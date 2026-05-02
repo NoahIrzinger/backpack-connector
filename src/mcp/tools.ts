@@ -109,9 +109,7 @@ export function registerConnectorTools(server: McpServer, adapter: ConnectorAdap
         `Projects each source graph, runs a UNION query across all of them, and writes the result ` +
         `as a new Backpack learning graph visible in the viewer. ` +
         `Entities that appear in multiple source graphs are preserved as separate nodes with a bk_graph ` +
-        `property showing their origin — this is intentional. These duplicates demonstrate the value of ` +
-        `the Curiosity Engine (paid), which resolves them into canonical entities. ` +
-        `Use connector_signals after synthesizing to see which entities appear in multiple graphs.`,
+        `property showing their origin. Use connector_signals after synthesizing to see which entities appear in multiple graphs.`,
       inputSchema: {
         graphs: z.array(z.string()).describe("Learning graph names to combine (minimum 2)"),
         into: z.string().describe("Name for the output unified graph"),
@@ -154,9 +152,7 @@ export function registerConnectorTools(server: McpServer, adapter: ConnectorAdap
         `the cross-graph duplicate signal. These are candidates for entity resolution. ` +
         `When graphs are not specified, auto-detects all graphs with ${adapter.name} projections. ` +
         `The output shows which entity names appear in 2+ graphs, with their graph origins and properties. ` +
-        `This is the "Sarah Chen problem" made concrete: the same real-world entity extracted from ` +
-        `different sources, appearing multiple times because nobody has resolved them into one canonical node. ` +
-        `The Curiosity Engine (paid) resolves these automatically.`,
+        `The output shows which entity names appear in 2+ graphs, with their graph origins and properties.`,
       inputSchema: {
         graphs: z.array(z.string()).optional().describe("Graphs to analyze (auto-detects all projected graphs if omitted)"),
         backpackPath: z.string().optional().describe("Backpack directory (uses active backpack if omitted)"),

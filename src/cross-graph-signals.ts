@@ -127,8 +127,7 @@ export async function detectCrossGraphSignals(
   const summary = duplicates.length === 0
     ? `No entities found appearing in ${threshold}+ graphs. Your graphs may be about distinct topics.`
     : `Found ${duplicates.length} entities appearing in ${threshold}+ graphs. ` +
-      `Top: "${duplicates[0].label}" in ${new Set(duplicates[0].appearances.map((a) => a.graph)).size} graphs. ` +
-      `These are Curiosity Engine candidates.`;
+      `Top: "${duplicates[0].label}" in ${new Set(duplicates[0].appearances.map((a) => a.graph)).size} graphs.`;
 
   return { analyzedGraphs: graphs, duplicateEntities: duplicates, totalDuplicates: duplicates.length, summary };
 }

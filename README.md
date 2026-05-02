@@ -187,14 +187,14 @@ await server.connect(transport);
 
 ## Architecture
 
-The event log is the source of truth. ArcadeDB is a derived projection. See [`docs/event-log-format.md`](../docs/event-log-format.md) for the full protocol spec.
+The event log is the source of truth. ArcadeDB is a derived projection. See [`docs/event-log-format.md`](https://github.com/NoahIrzinger/backpack-ontology/blob/main/docs/event-log-format.md) for the full protocol spec.
 
 ```
 Backpack learning graphs (events.jsonl)
   ↓  backpack-connector project
 ArcadeDB projection (Cypher / SQL queryable)
-  ↓  Curiosity Engine (backpackontology.com Intelligence tier)
-Canonical knowledge graph (cross-graph entity resolution)
+  ↓  backpack-connector synthesize
+Unified learning graph (viewable, traversable)
 ```
 
 Adding a new graph database backend: implement `ConnectorAdapter` in `src/adapters/<name>/`, register in `src/adapter-factory.ts`. The CLI, daemon, and MCP server work without changes.
