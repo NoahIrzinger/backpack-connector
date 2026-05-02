@@ -331,21 +331,41 @@ async function cmdInstallExtension(): Promise<void> {
     "../extensions/connector",
   );
   const configBase = process.env.XDG_CONFIG_HOME ?? path.join(process.env.HOME ?? "~", ".config");
-  const destDir = path.join(configBase, "backpack", "extensions", "connector");
+  const backpackConfigDir = path.join(configBase, "backpack");
+  const destDir = path.join(backpackConfigDir, "extensions", "connector");
+  const viewerConfigPath = path.join(backpackConfigDir, "viewer.json");
 
   if (!await fs.promises.access(srcDir).then(() => true).catch(() => false)) {
     process.stderr.write(`Error: extension source not found at ${srcDir}\n`);
     process.exit(1);
   }
 
+  // Copy extension files
   await fs.promises.mkdir(destDir, { recursive: true });
   for (const file of await fs.promises.readdir(srcDir)) {
     await fs.promises.copyFile(path.join(srcDir, file), path.join(destDir, file));
   }
 
-  process.stdout.write(`Installed connector viewer extension to ${destDir}\n`);
+  // Register in viewer.json so the viewer picks it up
+  let viewerConfig: Record<string, unknown> = {};
+  try {
+    viewerConfig = JSON.parse(await fs.promises.readFile(viewerConfigPath, "utf8")) as Record<string, unknown>;
+  } catch {
+    // file doesn't exist yet — start fresh
+  }
+
+  const exts = viewerConfig.extensions as Record<string, unknown> | undefined ?? {};
+  const external = (exts.external as Array<{ name: string; path: string }> | undefined ?? [])
+    .filter((e) => e.name !== "connector");
+  external.push({ name: "connector", path: destDir });
+  viewerConfig.extensions = { ...exts, external };
+
+  await fs.promises.writeFile(viewerConfigPath, JSON.stringify(viewerConfig, null, 2) + "\n");
+
+  process.stdout.write(`Installed connector extension to ${destDir}\n`);
+  process.stdout.write(`Registered in ${viewerConfigPath}\n`);
   process.stdout.write(`Restart the viewer (npx backpack-viewer) to activate it.\n`);
-  process.stdout.write(`The "Query" button will appear in the viewer's taskbar.\n`);
+  process.stdout.write(`The "⟨⟩ Query" button will appear in the viewer's taskbar.\n`);
 }
 
 // ─── mcp-config ──────────────────────────────────────────────────────────────
