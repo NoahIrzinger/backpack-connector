@@ -13,6 +13,9 @@
   "scripts": {
     "build": "tsc && cp -r extensions dist/",
     "dev": "tsc --watch --preserveWatchOutput",
+    "test": "vitest run tests/unit",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "test:all": "npm test && npm run test:e2e",
     "prepublishOnly": "npm run build",
     "release:patch": "npm version patch && git push && git push --tags",
     "release:minor": "npm version minor && git push && git push --tags",
@@ -27,7 +30,9 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "typescript": "^5.8.0"
+    "puppeteer-core": "^24.42.0",
+    "typescript": "^5.8.0",
+    "vitest": "^4.1.5"
   },
   "engines": {
     "node": ">=18"

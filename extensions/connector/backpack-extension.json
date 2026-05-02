@@ -8,6 +8,9 @@
   "stylesheet": "index.css",
   "permissions": {
     "viewer": ["focus"],
-    "settings": true
+    "settings": true,
+    "network": [
+      { "origin": "http://localhost:2480" }
+    ]
   }
 }

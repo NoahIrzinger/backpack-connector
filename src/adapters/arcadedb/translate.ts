@@ -132,9 +132,9 @@ export function translateNodeRetype(event: NodeRetypeEvent): SqlCmd {
 // Returns "needs-lookup" for operations that need the node's type resolved first.
 export type TranslateResult =
   | { kind: "cmds"; cmds: SqlCmd[]; nodeType?: string }
-  | { kind: "needs-node-lookup"; bkId: string }  // node.update and node.remove
-  | { kind: "needs-edge-lookup"; edge: Edge }      // edge.add: needs source+target types
-  | { kind: "needs-edge-type-lookup"; edgeId: string } // edge.remove: needs edge type
+  | { kind: "needs-node-lookup"; bkId: string }
+  | { kind: "needs-edge-lookup"; edge: Edge }
+  | { kind: "needs-edge-type-lookup"; edgeId: string }
   | null;
 
 export function translateEvent(event: GraphEvent, graph: string, branch: string): TranslateResult {

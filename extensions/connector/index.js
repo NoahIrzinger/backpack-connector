@@ -15,9 +15,9 @@ function basicAuth(user, pass) {
   return "Basic " + btoa(user + ":" + pass);
 }
 
-async function arcadeQuery(url, user, pass, database, language, query) {
+async function arcadeQuery(apiFetch, url, user, pass, database, language, query) {
   const endpoint = `${url}/api/v1/command/${encodeURIComponent(database)}`;
-  const res = await fetch(endpoint, {
+  const res = await apiFetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -33,6 +33,7 @@ async function arcadeQuery(url, user, pass, database, language, query) {
 }
 
 export async function activate(api) {
+  const apiFetch = api.fetch.bind(api);
   let cfg = {
     url: (await api.settings.get("url")) ?? DEFAULT_URL,
     user: (await api.settings.get("user")) ?? DEFAULT_USER,
@@ -74,6 +75,7 @@ export async function activate(api) {
 
   const dbField = makeField("Database", "text", deriveDatabase(api.getGraphName()));
   dbField.input.placeholder = "e.g. ms_teams_meeting_bot";
+  dbField.input.dataset.cq = "database";
 
   const langRow = makeLangRow();
   queryFields.append(dbField.row, langRow);
@@ -140,7 +142,7 @@ export async function activate(api) {
     execBtn.disabled = true;
 
     try {
-      const rows = await arcadeQuery(cfg.url, cfg.user, cfg.pass, db, lang, q);
+      const rows = await arcadeQuery(apiFetch, cfg.url, cfg.user, cfg.pass, db, lang, q);
       execBtn.disabled = false;
       renderResults(rows);
     } catch (err) {
