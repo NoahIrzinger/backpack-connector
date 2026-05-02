@@ -8,7 +8,6 @@ export interface SqlCmd {
 
 function buildUpsert(typeName: string, bkId: string, props: Record<string, unknown>): SqlCmd {
   // w_bk_id is the WHERE condition — separate param so a node property
-  // named "bk_id" can't overwrite it through the p_ loop below.
   const params: Record<string, unknown> = { w_bk_id: bkId };
   const setParts: string[] = [];
   for (const [k, v] of Object.entries(props)) {
@@ -121,15 +120,10 @@ export function translateEdgeRemove(event: EdgeRemoveEvent, typeSafe: string): S
 }
 
 export function translateNodeRetype(event: NodeRetypeEvent): SqlCmd {
-  // Update BackpackIndex to reflect the new type so subsequent edge lookups work.
   // The vertex itself stays in its original type bucket — full retype (delete+recreate)
-  // is a v2 feature since it requires preserving all connected edges.
   return translateIndexUpsert(event.id, sanitizeIdent(event.type));
 }
 
-// Translate a GraphEvent into one or more SQL commands.
-// Returns null for events that require async lookup (handled by the adapter directly).
-// Returns "needs-lookup" for operations that need the node's type resolved first.
 export type TranslateResult =
   | { kind: "cmds"; cmds: SqlCmd[]; nodeType?: string }
   | { kind: "needs-node-lookup"; bkId: string }

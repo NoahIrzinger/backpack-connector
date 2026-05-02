@@ -9,7 +9,6 @@ async function tryCommand(client: ArcadeDBClient, database: string, sql: string)
   try {
     await client.command(database, sql);
   } catch {
-    // ignore — type/property/index already exists
   }
 }
 
@@ -35,7 +34,6 @@ export class SchemaManager {
     await tryCommand(client, database, "CREATE PROPERTY BackpackState.bk_branch STRING");
     await tryCommand(client, database, "CREATE INDEX ON BackpackState (bk_graph, bk_branch) UNIQUE");
 
-    // BackpackIndex: bk_id → sanitized type name, used for edge creation and node.remove/retype
     await tryCommand(client, database, "CREATE DOCUMENT TYPE BackpackIndex");
     await tryCommand(client, database, "CREATE PROPERTY BackpackIndex.bk_id STRING");
     await tryCommand(client, database, "CREATE PROPERTY BackpackIndex.node_type STRING");

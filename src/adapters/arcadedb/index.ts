@@ -18,7 +18,6 @@ export class ArcadeDBAdapter implements ConnectorAdapter {
   readonly queryLanguages = ["opencypher", "sql", "gremlin"] as const;
 
   private schema = new SchemaManager();
-  // Per-database node type cache: Map<database, Map<bkId, sanitizedTypeSafe>>
   private nodeTypeCache = new Map<string, Map<string, string>>();
 
   constructor(private client: ArcadeDBClient) {}
@@ -114,8 +113,6 @@ export class ArcadeDBAdapter implements ConnectorAdapter {
     }
 
     if (result.kind === "needs-edge-type-lookup") {
-      // Look up the edge type from the database (we don't store an edge type index in v1)
-      // Try each known edge type — stops on first hit
       const edgeTypes = Array.from(this.schema.knownEdgeTypes(database));
       for (const typeSafe of edgeTypes) {
         const rows = await this.client.query(
@@ -218,7 +215,6 @@ export class ArcadeDBAdapter implements ConnectorAdapter {
         }
       }
     } catch {
-      // cache stays empty — lookups fall through to per-query resolution
     }
   }
 }

@@ -19,14 +19,11 @@ export interface DaemonOptions {
   onError?: (graph: string, err: Error) => void;
 }
 
-// Watches a set of graphs and projects new events as they arrive.
-// Polls the event log file — no OS-level file watch, portable everywhere.
 export async function runDaemon(options: DaemonOptions): Promise<void> {
   const { adapter, targets, pollMs = 1000 } = options;
 
   const lastSizes = new Map<string, number>();
 
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     for (const target of targets) {
       const branch = target.branch ?? "main";

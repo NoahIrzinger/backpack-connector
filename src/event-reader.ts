@@ -1,5 +1,3 @@
-// Implements the Backpack Event Log Format spec (docs/event-log-format.md).
-// This module is the single source of truth for how connectors read events.
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as readline from "node:readline";
@@ -40,7 +38,6 @@ export async function* streamEvents(
       event = parseEvent(trimmed);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      // Version mismatch or parse error — surface clearly rather than skip silently
       if (msg.includes("unknown schema version")) {
         throw new Error(
           `Event at ordinal ${ordinal} uses schema version incompatible with EVENT_SCHEMA_VERSION=${EVENT_SCHEMA_VERSION}. ` +
@@ -55,11 +52,3 @@ export async function* streamEvents(
   }
 }
 
-export async function countEvents(filePath: string): Promise<number> {
-  const rl = readline.createInterface({ input: fs.createReadStream(filePath), crlfDelay: Infinity });
-  let count = 0;
-  for await (const line of rl) {
-    if (line.trim()) count++;
-  }
-  return count;
-}

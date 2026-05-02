@@ -185,6 +185,37 @@ registerConnectorTools(server, adapter);
 await server.connect(transport);
 ```
 
+## Tutorial
+
+See [**docs/tutorial-knowledge-graph.md**](https://github.com/NoahIrzinger/backpack-ontology/blob/main/docs/tutorial-knowledge-graph.md) for a full walkthrough: building learning graphs through conversation, projecting into ArcadeDB, querying with Cypher, synthesizing multiple graphs, and using the viewer Query panel.
+
+## ArcadeDB
+
+Requires ArcadeDB 26.x and Java 21+. Download from [github.com/ArcadeData/arcadedb/releases](https://github.com/ArcadeData/arcadedb/releases).
+
+```bash
+# Start manually
+cd ~/arcadedb-26.4.2
+JAVA_OPTS="-Darcadedb.server.rootPassword=<password>" ./bin/server.sh
+
+# macOS: start automatically on login
+cat > ~/Library/LaunchAgents/com.arcadedb.server.plist << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.arcadedb.server</string>
+  <key>ProgramArguments</key><array>
+    <string>/bin/sh</string><string>-c</string>
+    <string>cd ~/arcadedb-26.4.2 && JAVA_OPTS="-Darcadedb.server.rootPassword=arcadedb" ./bin/server.sh</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>/tmp/arcadedb.log</string>
+  <key>StandardErrorPath</key><string>/tmp/arcadedb.log</string>
+</dict></plist>
+EOF
+launchctl load ~/Library/LaunchAgents/com.arcadedb.server.plist
+```
+
 ## Architecture
 
 The event log is the source of truth. ArcadeDB is a derived projection. See [`docs/event-log-format.md`](https://github.com/NoahIrzinger/backpack-ontology/blob/main/docs/event-log-format.md) for the full protocol spec.

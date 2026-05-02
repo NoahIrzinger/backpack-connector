@@ -100,7 +100,6 @@ export class ArcadeDBClient {
     return (body.result as Record<string, unknown>[]) ?? [];
   }
 
-  // Execute a query in any ArcadeDB-supported language (opencypher, sql, gremlin, etc.)
   async execute(database: string, language: string, queryText: string): Promise<Record<string, unknown>[]> {
     const res = await fetch(
       `${this.config.url}/api/v1/command/${encodeURIComponent(database)}`,

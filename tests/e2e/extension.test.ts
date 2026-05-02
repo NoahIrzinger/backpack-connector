@@ -1,14 +1,3 @@
-/**
- * E2E tests for the connector viewer extension.
- *
- * Requires:
- *   - Viewer running at VIEWER_URL (default http://localhost:5174)
- *   - ArcadeDB running at ARCADEDB_URL (default http://localhost:2480)
- *   - ms-teams-meeting-bot graph projected into ArcadeDB
- *   - Connector extension installed (backpack-connector install-extension)
- *
- * Run: npx vitest run tests/e2e/extension.test.ts
- */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import puppeteer, { type Browser, type Page } from "puppeteer-core";
 

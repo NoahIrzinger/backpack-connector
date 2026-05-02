@@ -3,7 +3,6 @@ import { ArcadeDBAdapter, ArcadeDBClient } from "./adapters/arcadedb/index.js";
 
 export interface AdapterConfig {
   adapter: string;
-  // ArcadeDB
   arcadedbUrl?: string;
   arcadedbUsername?: string;
   arcadedbPassword?: string;

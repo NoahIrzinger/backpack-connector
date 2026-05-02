@@ -122,7 +122,6 @@ export async function synthesize(
     onProgress?.(`Reading "${graph}" from ${adapter.name}...`);
     for (const node of await queryVertices(adapter, database, options.filter)) allNodes.set(node.id, node);
     for (const edge of await queryEdges(adapter, database)) {
-      // Only include edges where both endpoints survived the node filter
       if (allNodes.has(edge.sourceId) && allNodes.has(edge.targetId)) {
         allEdges.set(edge.id, edge);
       }
