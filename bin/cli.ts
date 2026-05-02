@@ -5,6 +5,8 @@ import { createAdapter } from "../src/adapter-factory.js";
 import { project } from "../src/projector.js";
 import { runDaemon } from "../src/daemon.js";
 import { sanitizeDatabaseName } from "../src/database-name.js";
+import { synthesize } from "../src/synthesizer.js";
+import { detectCrossGraphSignals } from "../src/cross-graph-signals.js";
 
 // ─── Arg parsing ─────────────────────────────────────────────────────────────
 
@@ -215,6 +217,109 @@ Optional:
   });
 }
 
+// ─── synthesize ──────────────────────────────────────────────────────────────
+
+async function cmdSynthesize(args: Record<string, string | boolean>): Promise<void> {
+  const graphsArg = str(args["graphs"]);
+  const into = str(args["into"]);
+
+  if (!graphsArg || !into) {
+    process.stdout.write(`
+Usage: backpack-connector synthesize [options]
+
+Required:
+  --graphs <a,b,c>         Comma-separated list of learning graph names to combine
+  --into <name>            Output graph name
+
+Optional:
+  --backpack-path <path>   Backpack directory (uses active backpack if omitted)
+  --branch <branch>        Source branch (default: main)
+  --adapter <name>         Adapter (default: arcadedb)
+  --reset                  Overwrite output graph if it exists
+  --no-project             Skip projecting source graphs (use existing projections)
+
+Example:
+  backpack-connector synthesize \\
+    --graphs "teams-bot,ms-graph-research,azure-speech" \\
+    --into teams-bot-unified
+
+  # Then view at http://localhost:5173#teams-bot-unified
+  # Run 'backpack-connector signals --graphs teams-bot,ms-graph-research,azure-speech'
+  # to see which entities appear in multiple graphs
+`);
+    process.exit(1);
+  }
+
+  const graphs = graphsArg.split(",").map((g) => g.trim()).filter(Boolean);
+  if (graphs.length < 2) {
+    process.stderr.write("Error: provide at least 2 graphs to synthesize.\n");
+    process.exit(1);
+  }
+
+  const adapter = adapterArg(args);
+  const backpackPath = await resolveBackpackPath(args);
+
+  process.stdout.write(`Synthesizing ${graphs.join(", ")} → "${into}"...\n`);
+
+  const result = await synthesize(
+    adapter,
+    {
+      backpackPath,
+      graphs,
+      into,
+      branch: str(args["branch"]),
+      reset: args["reset"] === true,
+      projectFirst: args["no-project"] !== true,
+    },
+    (msg) => process.stdout.write(`  ${msg}\n`),
+  );
+
+  process.stdout.write(`\nDone in ${result.durationMs}ms\n`);
+  process.stdout.write(`  Output:  ${result.outputGraph}\n`);
+  process.stdout.write(`  Nodes:   ${result.nodeCount}\n`);
+  process.stdout.write(`  Edges:   ${result.edgeCount}\n`);
+  process.stdout.write(`  Viewer:  ${result.viewerUrl}\n`);
+  process.stdout.write(`\nRun 'backpack-connector signals --graphs ${graphs.join(",")}' to see cross-graph duplicates.\n`);
+}
+
+// ─── signals ─────────────────────────────────────────────────────────────────
+
+async function cmdSignals(args: Record<string, string | boolean>): Promise<void> {
+  const graphsArg = str(args["graphs"]);
+  const graphs = graphsArg ? graphsArg.split(",").map((g) => g.trim()).filter(Boolean) : undefined;
+  const threshold = args["threshold"] ? parseInt(String(args["threshold"]), 10) : 2;
+
+  if (!graphs) {
+    process.stdout.write("Auto-detecting projected graphs...\n");
+  }
+
+  const adapter = adapterArg(args);
+  const report = await detectCrossGraphSignals(adapter, { graphs, threshold });
+
+  process.stdout.write(`\nAnalyzed: ${report.analyzedGraphs.join(", ")}\n`);
+  process.stdout.write(`${report.summary}\n\n`);
+
+  if (report.duplicateEntities.length > 0) {
+    process.stdout.write(`Top cross-graph duplicates:\n`);
+    const top = report.duplicateEntities.slice(0, 10);
+    for (const entity of top) {
+      const graphNames = [...new Set(entity.appearances.map((a) => a.graph))];
+      process.stdout.write(
+        `  "${entity.label}" (${entity.type}) — appears in ${graphNames.length} graphs: ${graphNames.join(", ")}\n`,
+      );
+    }
+    if (report.duplicateEntities.length > 10) {
+      process.stdout.write(`  ... and ${report.duplicateEntities.length - 10} more\n`);
+    }
+    process.stdout.write(`\nFull report (JSON):\n`);
+    if (args["json"]) {
+      process.stdout.write(JSON.stringify(report, null, 2) + "\n");
+    } else {
+      process.stdout.write(`  Run with --json for the full machine-readable report\n`);
+    }
+  }
+}
+
 // ─── mcp-config ──────────────────────────────────────────────────────────────
 
 async function cmdMcpConfig(args: Record<string, string | boolean>): Promise<void> {
@@ -258,6 +363,8 @@ Usage: backpack-connector <command> [options]
 
 Commands:
   project     Project a learning graph into the connected graph database
+  synthesize  Combine multiple graphs into a unified view via ArcadeDB UNION
+  signals     Detect entities appearing in multiple graphs (cross-graph duplicates)
   query       Run Cypher or SQL against a projected graph
   schema      Show schema for a projected graph
   daemon      Watch for new events and project them continuously
@@ -276,6 +383,8 @@ async function main(): Promise<void> {
     case "query":      return cmdQuery(args);
     case "schema":     return cmdSchema(args);
     case "daemon":     return cmdDaemon(args);
+    case "synthesize": return cmdSynthesize(args);
+    case "signals":    return cmdSignals(args);
     case "mcp-config": return cmdMcpConfig(args);
     default:
       globalUsage();

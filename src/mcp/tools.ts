@@ -4,6 +4,8 @@ import { getActiveBackpack } from "backpack-ontology/connector";
 import type { ConnectorAdapter } from "../adapter.js";
 import { project } from "../projector.js";
 import { sanitizeDatabaseName } from "../database-name.js";
+import { synthesize } from "../synthesizer.js";
+import { detectCrossGraphSignals } from "../cross-graph-signals.js";
 
 async function resolveBackpackPath(provided?: string): Promise<string> {
   if (provided) return provided;
@@ -92,6 +94,80 @@ export function registerConnectorTools(server: McpServer, adapter: ConnectorAdap
       try {
         const schema = await adapter.getSchema(database);
         return { content: [{ type: "text" as const, text: JSON.stringify(schema, null, 2) }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }] };
+      }
+    },
+  );
+
+  server.registerTool(
+    "connector_synthesize",
+    {
+      title: "Synthesize Graphs in " + adapter.name,
+      description:
+        `Combine multiple Backpack learning graphs into a single unified graph using ${adapter.name}. ` +
+        `Projects each source graph, runs a UNION query across all of them, and writes the result ` +
+        `as a new Backpack learning graph visible in the viewer. ` +
+        `Entities that appear in multiple source graphs are preserved as separate nodes with a bk_graph ` +
+        `property showing their origin — this is intentional. These duplicates demonstrate the value of ` +
+        `the Curiosity Engine (paid), which resolves them into canonical entities. ` +
+        `Use connector_signals after synthesizing to see which entities appear in multiple graphs.`,
+      inputSchema: {
+        graphs: z.array(z.string()).describe("Learning graph names to combine (minimum 2)"),
+        into: z.string().describe("Name for the output unified graph"),
+        backpackPath: z.string().optional().describe("Backpack directory (uses active backpack if omitted)"),
+        branch: z.string().optional().describe("Branch to read from (default: main)"),
+        reset: z.boolean().optional().describe("Overwrite the output graph if it already exists"),
+        projectFirst: z.boolean().optional().describe("Project source graphs before synthesizing (default: true)"),
+      },
+    },
+    async ({ graphs, into, backpackPath, branch, reset, projectFirst }) => {
+      try {
+        if (graphs.length < 2) {
+          return { content: [{ type: "text" as const, text: "Error: provide at least 2 graphs to synthesize." }] };
+        }
+        const resolvedPath = await resolveBackpackPath(backpackPath);
+        const result = await synthesize(
+          adapter,
+          { backpackPath: resolvedPath, graphs, into, branch, reset, projectFirst },
+          (msg) => process.stderr.write(msg + "\n"),
+        );
+        const text =
+          `Synthesized ${result.sourceGraphs.length} graphs into "${result.outputGraph}"\n` +
+          `Nodes: ${result.nodeCount}  Edges: ${result.edgeCount}  Duration: ${result.durationMs}ms\n\n` +
+          `View: ${result.viewerUrl}\n\n` +
+          `Note: duplicate entities from different source graphs are visible — each node has a bk_graph ` +
+          `property showing which graph it came from. Run connector_signals to see cross-graph duplicates.`;
+        return { content: [{ type: "text" as const, text }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }] };
+      }
+    },
+  );
+
+  server.registerTool(
+    "connector_signals",
+    {
+      title: "Cross-Graph Signals",
+      description:
+        `Detect entities that appear in multiple projected Backpack learning graphs — ` +
+        `the cross-graph duplicate signal. These are candidates for entity resolution. ` +
+        `When graphs are not specified, auto-detects all graphs with ${adapter.name} projections. ` +
+        `The output shows which entity names appear in 2+ graphs, with their graph origins and properties. ` +
+        `This is the "Sarah Chen problem" made concrete: the same real-world entity extracted from ` +
+        `different sources, appearing multiple times because nobody has resolved them into one canonical node. ` +
+        `The Curiosity Engine (paid) resolves these automatically.`,
+      inputSchema: {
+        graphs: z.array(z.string()).optional().describe("Graphs to analyze (auto-detects all projected graphs if omitted)"),
+        backpackPath: z.string().optional().describe("Backpack directory (uses active backpack if omitted)"),
+        threshold: z.number().int().min(2).optional().describe("Min graph count to flag as a duplicate (default: 2)"),
+      },
+    },
+    async ({ graphs, threshold }) => {
+      try {
+        const report = await detectCrossGraphSignals(adapter, { graphs, threshold });
+        const text = JSON.stringify(report, null, 2);
+        return { content: [{ type: "text" as const, text }] };
       } catch (e) {
         return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }] };
       }

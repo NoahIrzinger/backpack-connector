@@ -26,6 +26,7 @@ function buildUpsert(typeName: string, bkId: string, props: Record<string, unkno
 function nodeProps(node: Node, graph: string, branch: string): Record<string, unknown> {
   const props: Record<string, unknown> = {
     bk_id: node.id,
+    bk_type: node.type,
     bk_graph: graph,
     bk_branch: branch,
     bk_created_at: node.createdAt,
@@ -40,6 +41,7 @@ function nodeProps(node: Node, graph: string, branch: string): Record<string, un
 function edgeProps(edge: Edge, graph: string, branch: string): Record<string, unknown> {
   const props: Record<string, unknown> = {
     bk_id: edge.id,
+    bk_type: edge.type,
     bk_graph: graph,
     bk_branch: branch,
     bk_created_at: edge.createdAt,

@@ -14,7 +14,6 @@ async function tryCommand(client: ArcadeDBClient, database: string, sql: string)
 }
 
 export class SchemaManager {
-  // Scoped by database: Map<database, Set<sanitizedTypeName>>
   private vertexTypes = new Map<string, Set<string>>();
   private edgeTypes = new Map<string, Set<string>>();
 

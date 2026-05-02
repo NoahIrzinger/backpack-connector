@@ -7,6 +7,10 @@ export { sanitizeDatabaseName } from "./database-name.js";
 export { createAdapter, adapterFromEnv } from "./adapter-factory.js";
 export type { AdapterConfig } from "./adapter-factory.js";
 export { registerConnectorTools } from "./mcp/tools.js";
+export { synthesize } from "./synthesizer.js";
+export type { SynthesizeOptions, SynthesizeResult } from "./synthesizer.js";
+export { detectCrossGraphSignals } from "./cross-graph-signals.js";
+export type { CrossGraphSignalReport, CrossGraphEntity } from "./cross-graph-signals.js";
 
 // Adapters
 export { ArcadeDBAdapter, ArcadeDBClient } from "./adapters/arcadedb/index.js";
