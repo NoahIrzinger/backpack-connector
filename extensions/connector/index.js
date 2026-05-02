@@ -53,16 +53,44 @@ export async function activate(api) {
   const urlField = makeField("URL", "text", cfg.url);
   const userField = makeField("Username", "text", cfg.user);
   const passField = makeField("Password", "password", cfg.pass);
+  const testBtn = makeBtn("Test connection", false);
   const saveBtn = makeBtn("Save", false);
   saveBtn.classList.add("cq-btn-primary");
 
-  settingsSection.append(urlField.row, userField.row, passField.row, makeActions([saveBtn]));
+  const connStatus = document.createElement("div");
+  connStatus.className = "cq-conn-status";
+
+  settingsSection.append(urlField.row, userField.row, passField.row, makeActions([testBtn, saveBtn]), connStatus);
+
+  testBtn.addEventListener("click", async () => {
+    const url = urlField.input.value.trim();
+    const user = userField.input.value.trim();
+    const pass = passField.input.value;
+    connStatus.className = "cq-conn-status cq-conn-testing";
+    connStatus.textContent = "Testing…";
+    try {
+      const res = await apiFetch(`${url}/api/v1/ready`, {
+        headers: { "Authorization": basicAuth(user, pass) },
+      });
+      if (res.ok) {
+        connStatus.className = "cq-conn-status cq-conn-ok";
+        connStatus.textContent = "Connected";
+      } else {
+        connStatus.className = "cq-conn-status cq-conn-error";
+        connStatus.textContent = `HTTP ${res.status}`;
+      }
+    } catch (e) {
+      connStatus.className = "cq-conn-status cq-conn-error";
+      connStatus.textContent = e.message.includes("fetch") ? "Could not reach ArcadeDB" : e.message;
+    }
+  });
 
   saveBtn.addEventListener("click", async () => {
     cfg = { url: urlField.input.value.trim(), user: userField.input.value.trim(), pass: passField.input.value };
     await api.settings.set("url", cfg.url);
     await api.settings.set("user", cfg.user);
     await api.settings.set("pass", cfg.pass);
+    connStatus.textContent = "";
     settingsSection.hidden = true;
     querySection.hidden = false;
   });
@@ -77,7 +105,14 @@ export async function activate(api) {
   dbField.input.placeholder = "e.g. ms_teams_meeting_bot";
   dbField.input.dataset.cq = "database";
 
-  const langRow = makeLangRow();
+  const PLACEHOLDERS = {
+    opencypher: "MATCH (n:Platform)-[r]->(a:API)\nRETURN n.name, type(r), a.name LIMIT 20",
+    sql: "SELECT name, bk_type, bk_graph FROM Platform LIMIT 20",
+  };
+
+  const langRow = makeLangRow((lang) => {
+    textarea.placeholder = PLACEHOLDERS[lang] ?? PLACEHOLDERS.opencypher;
+  });
   queryFields.append(dbField.row, langRow);
 
   const textareaWrap = document.createElement("div");
@@ -85,7 +120,7 @@ export async function activate(api) {
   const textarea = document.createElement("textarea");
   textarea.className = "cq-textarea";
   textarea.rows = 4;
-  textarea.placeholder = "MATCH (n:Platform)-[r]->(a:API)\nRETURN n.name, type(r), a.name LIMIT 20";
+  textarea.placeholder = PLACEHOLDERS.opencypher;
   textareaWrap.appendChild(textarea);
 
   const execBtn = makeBtn("Execute", false);
@@ -360,7 +395,7 @@ export async function activate(api) {
     return div;
   }
 
-  function makeLangRow() {
+  function makeLangRow(onChange) {
     const row = document.createElement("div");
     row.className = "cq-field";
     const lbl = document.createElement("label");
@@ -370,16 +405,22 @@ export async function activate(api) {
     radios.className = "cq-radio-row";
 
     let selected = "opencypher";
+    const groupName = "cq-lang-" + Math.random().toString(36).slice(2);
 
     for (const [value, label] of [["opencypher", "Cypher"], ["sql", "SQL"]]) {
       const l = document.createElement("label");
       l.className = "cq-radio-label";
       const r = document.createElement("input");
       r.type = "radio";
-      r.name = "cq-lang-" + Math.random().toString(36).slice(2);
+      r.name = groupName;
       r.value = value;
       r.checked = value === "opencypher";
-      r.addEventListener("change", () => { if (r.checked) selected = value; });
+      r.addEventListener("change", () => {
+        if (r.checked) {
+          selected = value;
+          onChange?.(value);
+        }
+      });
       l.append(r, label);
       radios.appendChild(l);
     }
