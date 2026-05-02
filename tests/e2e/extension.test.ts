@@ -20,9 +20,11 @@ let browser: Browser;
 let page: Page;
 
 beforeAll(async () => {
+  const headless = process.env.HEADLESS !== "false";
   browser = await puppeteer.launch({
     executablePath: CHROME,
-    headless: true,
+    headless,
+    slowMo: headless ? 0 : 80,
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
   });
   page = await browser.newPage();
@@ -196,6 +198,15 @@ describe("query panel", () => {
 
 describe("error handling", () => {
   it("shows error message for invalid Cypher", async () => {
+    await page.waitForSelector(".cq-root", { timeout: 5000 }).catch(() => {
+      // Panel may have been closed — reopen it
+      return page.evaluate(() => {
+        const btns = Array.from(document.querySelectorAll("button"));
+        btns.find((b) => b.textContent?.includes("Query"))?.click();
+      });
+    });
+    await new Promise((r) => setTimeout(r, 300));
+
     await page.evaluate((db: string) => {
       const input = document.querySelector<HTMLInputElement>('[data-cq="database"]');
       if (input) input.value = db;
