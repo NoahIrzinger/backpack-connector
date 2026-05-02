@@ -22,7 +22,7 @@
     "release:major": "npm version major && git push && git push --tags"
   },
   "dependencies": {
-    "backpack-ontology": "^0.8.2",
+    "backpack-ontology": "^0.8.3",
     "zod": "^3.25.0"
   },
   "peerDependencies": {
