@@ -297,7 +297,7 @@ export async function activate(api) {
   api.registerTaskbarIcon({
     label: "Query",
     iconText: "⟨⟩",
-    position: "bottom-right",
+    position: "top-right",
     onClick() {
       if (!panel) {
         panel = api.mountPanel(root, {

@@ -5,7 +5,8 @@
   min-width: 420px;
   font-size: 13px;
   font-family: inherit;
-  color: var(--text-primary, #e8e8e8);
+  color: var(--text);
+  background: var(--bg);
 }
 
 .cq-section {
@@ -24,16 +25,16 @@
 
 .cq-label {
   font-size: 11px;
-  color: var(--text-secondary, #888);
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
 .cq-input {
-  background: var(--bg-input, #1a1a1a);
-  border: 1px solid var(--border, #333);
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
   border-radius: 4px;
-  color: inherit;
+  color: var(--text);
   font-size: 12px;
   padding: 4px 8px;
   outline: none;
@@ -43,7 +44,7 @@
 }
 
 .cq-input:focus {
-  border-color: var(--accent, #4f9eff);
+  border-color: var(--accent);
 }
 
 .cq-input[type="password"] {
@@ -62,6 +63,7 @@
   gap: 5px;
   cursor: pointer;
   font-size: 12px;
+  color: var(--text);
 }
 
 .cq-textarea-wrap {
@@ -69,10 +71,10 @@
 }
 
 .cq-textarea {
-  background: var(--bg-input, #1a1a1a);
-  border: 1px solid var(--border, #333);
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
   border-radius: 4px;
-  color: inherit;
+  color: var(--text);
   font-size: 12px;
   font-family: monospace;
   padding: 8px;
@@ -85,7 +87,7 @@
 }
 
 .cq-textarea:focus {
-  border-color: var(--accent, #4f9eff);
+  border-color: var(--accent);
 }
 
 .cq-actions {
@@ -95,10 +97,10 @@
 }
 
 .cq-btn {
-  background: var(--bg-btn, #2a2a2a);
-  border: 1px solid var(--border, #333);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
   border-radius: 4px;
-  color: inherit;
+  color: var(--text);
   cursor: pointer;
   font-size: 12px;
   padding: 5px 12px;
@@ -106,17 +108,18 @@
 }
 
 .cq-btn:hover {
-  background: var(--bg-btn-hover, #333);
+  background: var(--bg-hover);
 }
 
 .cq-btn-primary {
-  background: var(--accent, #4f9eff);
-  border-color: var(--accent, #4f9eff);
-  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--badge-text, #141414);
 }
 
 .cq-btn-primary:hover {
-  opacity: 0.85;
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 .cq-btn:disabled {
@@ -126,8 +129,9 @@
 
 .cq-divider {
   height: 1px;
-  background: var(--border, #333);
+  background: var(--border);
   margin: 0;
+  border: none;
 }
 
 .cq-results {
@@ -143,7 +147,7 @@
   align-items: center;
   gap: 10px;
   font-size: 11px;
-  color: var(--text-secondary, #888);
+  color: var(--text-muted);
 }
 
 .cq-focus-btn {
@@ -165,36 +169,37 @@
 .cq-table th {
   text-align: left;
   padding: 4px 6px;
-  border-bottom: 1px solid var(--border, #333);
-  color: var(--text-secondary, #888);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
   font-weight: 600;
   white-space: nowrap;
   position: sticky;
   top: 0;
-  background: var(--bg-panel, #141414);
+  background: var(--bg);
 }
 
 .cq-table td {
   padding: 3px 6px;
-  border-bottom: 1px solid var(--border-faint, #222);
+  border-bottom: 1px solid var(--bg-active);
   max-width: 240px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--text);
 }
 
 .cq-table tr:hover td {
-  background: var(--bg-hover, #1e1e1e);
+  background: var(--bg-hover);
 }
 
 .cq-error {
-  color: var(--error, #ff6b6b);
+  color: #f87171;
   font-size: 12px;
   padding: 8px 14px;
 }
 
 .cq-empty {
-  color: var(--text-secondary, #888);
+  color: var(--text-muted);
   font-size: 12px;
   padding: 12px 14px;
   font-style: italic;
@@ -202,6 +207,6 @@
 
 .cq-spinner {
   padding: 12px 14px;
-  color: var(--text-secondary, #888);
+  color: var(--text-muted);
   font-size: 12px;
 }
