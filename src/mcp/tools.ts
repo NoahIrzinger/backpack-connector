@@ -6,6 +6,7 @@ import { project } from "../projector.js";
 import { sanitizeDatabaseName } from "../database-name.js";
 import { synthesize } from "../synthesizer.js";
 import { detectCrossGraphSignals } from "../cross-graph-signals.js";
+import { runConnectorSignals } from "../connector-signals.js";
 
 async function resolveBackpackPath(provided?: string): Promise<string> {
   if (provided) return provided;
@@ -167,6 +168,39 @@ export function registerConnectorTools(server: McpServer, adapter: ConnectorAdap
       try {
         const report = await detectCrossGraphSignals(adapter, { graphs, threshold });
         const text = JSON.stringify(report, null, 2);
+        return { content: [{ type: "text" as const, text }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }] };
+      }
+    },
+  );
+
+  server.registerTool(
+    "connector_signal_detect",
+    {
+      title: "Detect Connector Signals",
+      description:
+        `Run ArcadeDB-powered signal detectors across all projected learning graphs and merge results ` +
+        `into the Backpack signal store. Detects: cross-graph entity duplicates with confidence scores, ` +
+        `type drift (same entity name with different types across graphs), centrality hubs (unusually ` +
+        `connected nodes), and cross-graph bridge nodes. Also runs any user-defined Cypher detectors ` +
+        `configured in ~/.config/backpack/signals.json. ` +
+        `After running, use backpack_signal_list to see all signals including these connector signals ` +
+        `alongside the standard file-based signals.`,
+      inputSchema: {
+        backpackPath: z.string().optional().describe("Backpack directory (uses active backpack if omitted)"),
+      },
+    },
+    async ({ backpackPath }) => {
+      try {
+        const resolvedPath = await resolveBackpackPath(backpackPath);
+        const result = await runConnectorSignals(adapter, resolvedPath);
+        const text = result.detected === 0
+          ? "No connector signals detected. Ensure graphs are projected with connector_project first."
+          : `Detected ${result.detected} connector signal${result.detected === 1 ? "" : "s"} and merged into signal store.\n` +
+            `Use backpack_signal_list to view all signals.\n\n` +
+            result.signals.slice(0, 5).map((s) => `• [${s.severity.toUpperCase()}] ${s.title}`).join("\n") +
+            (result.signals.length > 5 ? `\n... and ${result.signals.length - 5} more` : "");
         return { content: [{ type: "text" as const, text }] };
       } catch (e) {
         return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }] };

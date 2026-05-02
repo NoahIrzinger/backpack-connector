@@ -11,6 +11,8 @@ export { synthesize } from "./synthesizer.js";
 export type { SynthesizeOptions, SynthesizeResult } from "./synthesizer.js";
 export { detectCrossGraphSignals } from "./cross-graph-signals.js";
 export type { CrossGraphSignalReport, CrossGraphEntity } from "./cross-graph-signals.js";
+export { runConnectorSignals, loadGlobalSignalConfig } from "./connector-signals.js";
+export type { ConnectorSignalResult, UserDefinedQuery } from "./connector-signals.js";
 
 export { ArcadeDBAdapter, ArcadeDBClient } from "./adapters/arcadedb/index.js";
 export type { ArcadeDBConfig } from "./adapters/arcadedb/index.js";
