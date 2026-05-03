@@ -37,24 +37,27 @@ backpack-connector mcp-config
 
 ### `project`
 
-Project a Backpack learning graph into the connected graph database. Incremental — only processes new events since the last run.
+Project a Backpack learning graph into ArcadeDB. Incremental — only processes new events since the last run.
 
 ```bash
 backpack-connector project \
   --graph <name>              # required: graph name
   [--backpack-path <path>]    # defaults to active backpack
-  [--database <name>]         # override database name (default: graph name, hyphens → underscores)
   [--branch <branch>]         # default: main
   [--adapter arcadedb]        # default: arcadedb, or BACKPACK_ADAPTER env var
-  [--reset]                   # drop and recreate database before projecting
+  [--reset]                   # clear this graph's nodes and re-project from scratch
 ```
 
-**Cross-graph queries** — project multiple graphs into one database:
+All graphs from all backpacks land in a single ArcadeDB database named `"backpack"`. Every node is tagged `bk_backpack` (which backpack it came from) and `bk_graph` (which learning graph). This is what makes cross-graph Cypher queries possible without any per-graph database management.
+
+**Cross-graph queries** — project multiple graphs, query them together:
 
 ```bash
-backpack-connector project --graph project-alpha --database team_graphs
-backpack-connector project --graph project-beta  --database team_graphs
-# Now query across both with WHERE n.bk_graph = 'project-alpha'
+backpack-connector project --graph project-alpha
+backpack-connector project --graph project-beta
+# Both land in the same "backpack" database
+backpack-connector query --cypher "MATCH (n) WHERE n.bk_graph = 'project-alpha' RETURN n.name, n.bk_type LIMIT 10"
+backpack-connector query --cypher "MATCH (a)-[r]->(b) WHERE a.bk_graph <> b.bk_graph RETURN a.name, type(r), b.name LIMIT 10"
 ```
 
 ### `query`
@@ -194,6 +197,24 @@ const server = await createMcpServer({ mode: "local", dataDir: config.dataDir })
 registerConnectorTools(server, adapter);
 await server.connect(transport);
 ```
+
+## Knowledge Graph in the viewer
+
+Once backpack-connector is installed alongside [backpack-viewer](https://github.com/NoahIrzinger/backpack-viewer), the viewer's sidebar gains a live **Knowledge Graph** section. It shows a real-time count of projected nodes and graphs and loads the unified canvas when clicked — all backpacks, all graphs, all nodes in one view.
+
+```bash
+# Install both
+npm install -g backpack-connector
+npx backpack-viewer   # Knowledge Graph section activates automatically
+
+# Project graphs to populate it
+backpack-connector project --graph my-graph
+backpack-connector project --graph another-graph
+```
+
+The viewer reads ArcadeDB directly via the same environment variables (`ARCADEDB_URL`, `ARCADEDB_USERNAME`, `ARCADEDB_PASSWORD`). If backpack-connector is not installed, the Knowledge Graph section stays grayed out — all other viewer features work normally.
+
+Clicking the section opens the **Graph Query panel** in the viewer, where you can run Cypher against the full "backpack" database and focus results back onto the canvas.
 
 ## Tutorial
 
