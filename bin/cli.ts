@@ -8,7 +8,7 @@ import { runDaemon } from "../src/daemon.js";
 import { sanitizeDatabaseName, DEFAULT_DATABASE } from "../src/database-name.js";
 import { synthesize } from "../src/synthesizer.js";
 import { detectCrossGraphSignals } from "../src/cross-graph-signals.js";
-import { runAutoDaemon, installDaemon, uninstallDaemon, daemonStatus } from "../src/auto-daemon.js";
+import { runAutoDaemon, runAllBackpacksDaemon, installDaemon, uninstallDaemon, daemonStatus } from "../src/auto-daemon.js";
 
 // ─── Arg parsing ─────────────────────────────────────────────────────────────
 
@@ -181,9 +181,15 @@ async function cmdSchema(args: Record<string, string | boolean>): Promise<void> 
 
 async function cmdDaemon(args: Record<string, string | boolean>): Promise<void> {
   const adapter = adapterArg(args);
-  const backpackPath = await resolveBackpackPath(args);
   const pollMs = args["poll"] ? parseInt(String(args["poll"]), 10) : 1000;
 
+  if (args["all-backpacks"]) {
+    process.stderr.write(`[daemon] mode: all registered backpacks (${adapter.name})\n`);
+    await runAllBackpacksDaemon(adapter, pollMs);
+    return;
+  }
+
+  const backpackPath = await resolveBackpackPath(args);
   if (args["graph"]) {
     const graphs = String(args["graph"]).split(",").map((g) => g.trim()).filter(Boolean);
     process.stderr.write(`Daemon watching ${graphs.join(", ")} (${adapter.name})\n`);
@@ -200,10 +206,12 @@ async function cmdDaemon(args: Record<string, string | boolean>): Promise<void> 
 }
 
 async function cmdDaemonInstall(args: Record<string, string | boolean>): Promise<void> {
-  const backpackPath = await resolveBackpackPath(args);
+  const allBackpacks = !!args["all-backpacks"];
+  const backpackPath = allBackpacks ? undefined : await resolveBackpackPath(args);
   try {
     const dest = await installDaemon({
       backpackPath,
+      allBackpacks,
       adapterEnv: {
         ...(args["url"]      ? { ARCADEDB_URL:      String(args["url"])      } : {}),
         ...(args["username"] ? { ARCADEDB_USERNAME: String(args["username"]) } : {}),

@@ -2,7 +2,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as os from "node:os";
 import * as child_process from "node:child_process";
-import { Backpack, EventSourcedBackend } from "backpack-ontology";
+import { Backpack, EventSourcedBackend, listBackpacks } from "backpack-ontology";
 import type { ConnectorAdapter } from "./adapter.js";
 import { runDaemon, type DaemonTarget } from "./daemon.js";
 import { adapterFromEnv } from "./adapter-factory.js";
@@ -95,8 +95,59 @@ function assertMacOS(): void {
   }
 }
 
+export async function runAllBackpacksDaemon(
+  adapter: ConnectorAdapter,
+  pollMs = 1000,
+): Promise<void> {
+  const targets: DaemonTarget[] = [];
+  const watchedKeys = new Set<string>();
+
+  async function rescanAllBackpacks() {
+    const allBackpacks = await listBackpacks().catch(() => []);
+    for (const bp of allBackpacks) {
+      if (!bp.path || bp.path.startsWith("cloud://") || bp.path.startsWith("/private/tmp")) continue;
+      const resolved = path.resolve(bp.path);
+      if (!resolved.startsWith(os.homedir()) && !resolved.startsWith("/Volumes")) continue;
+      try {
+        const backend = new EventSourcedBackend(undefined, { graphsDirOverride: resolved });
+        const bpInstance = new Backpack(backend);
+        await bpInstance.initialize();
+        const graphs = await bpInstance.listOntologies();
+        for (const g of graphs) {
+          const key = `${resolved}::${g.name}`;
+          if (!watchedKeys.has(key)) {
+            watchedKeys.add(key);
+            targets.push({ backpackPath: resolved, graph: g.name });
+            process.stderr.write(`[daemon] watching: ${bp.name}/${g.name}\n`);
+          }
+        }
+      } catch { /* skip inaccessible backpack */ }
+    }
+  }
+
+  await rescanAllBackpacks();
+  const rescanTimer = setInterval(rescanAllBackpacks, GRAPH_RESCAN_MS);
+
+  process.stderr.write(`[daemon] watching ${targets.length} graphs across all backpacks\n`);
+  process.stderr.write(`[daemon] adapter: ${adapter.name}\n`);
+
+  process.on("SIGINT", () => { clearInterval(rescanTimer); process.exit(0); });
+  process.on("SIGTERM", () => { clearInterval(rescanTimer); process.exit(0); });
+
+  await runDaemon({
+    adapter,
+    targets,
+    pollMs,
+    onSync: (graph, count) =>
+      process.stderr.write(`[${new Date().toISOString().slice(11, 19)}] ${graph}: +${count} events projected\n`),
+    onError: (graph, err) =>
+      process.stderr.write(`[daemon][error] ${graph}: ${err.message}\n`),
+  });
+}
+
 export async function installDaemon(opts: {
-  backpackPath: string;
+  backpackPath?: string;
+  allBackpacks?: boolean;
   adapterEnv?: Record<string, string>;
 }): Promise<string> {
   const binCmd = resolveDaemonBin();
@@ -112,8 +163,13 @@ export async function installDaemon(opts: {
     .map(([k, v]) => `    <key>${xmlEscape(k)}</key><string>${xmlEscape(v)}</string>`)
     .join("\n");
 
-  // Use double-quote wrapping and escape the path for shell safety
-  const escapedPath = opts.backpackPath.replace(/"/g, '\\"');
+  const daemonCmd = opts.allBackpacks
+    ? `${xmlEscape(binCmd)} daemon --all-backpacks`
+    : (() => {
+        if (!opts.backpackPath) throw new Error("backpackPath required when allBackpacks is false");
+        const escapedPath = opts.backpackPath.replace(/"/g, '\\"');
+        return `${xmlEscape(binCmd)} daemon --backpack-path "${xmlEscape(escapedPath)}"`;
+      })();
 
   const plist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -122,7 +178,7 @@ export async function installDaemon(opts: {
   <key>ProgramArguments</key><array>
     <string>/bin/sh</string>
     <string>-c</string>
-    <string>${xmlEscape(binCmd)} daemon --backpack-path "${xmlEscape(escapedPath)}"</string>
+    <string>${daemonCmd}</string>
   </array>
   <key>EnvironmentVariables</key><dict>
 ${envEntries}

@@ -1,6 +1,6 @@
 {
   "name": "connector",
-  "version": "0.1.5",
+  "version": "0.1.10",
   "viewerApi": "1",
   "displayName": "Graph Query",
   "description": "Query projected learning graphs with Cypher or SQL directly from the viewer",
