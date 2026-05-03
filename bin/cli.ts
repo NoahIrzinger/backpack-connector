@@ -8,6 +8,7 @@ import { runDaemon } from "../src/daemon.js";
 import { sanitizeDatabaseName } from "../src/database-name.js";
 import { synthesize } from "../src/synthesizer.js";
 import { detectCrossGraphSignals } from "../src/cross-graph-signals.js";
+import { runAutoDaemon, installDaemon, uninstallDaemon, daemonStatus } from "../src/auto-daemon.js";
 
 // ─── Arg parsing ─────────────────────────────────────────────────────────────
 
@@ -179,43 +180,59 @@ async function cmdSchema(args: Record<string, string | boolean>): Promise<void> 
 // ─── daemon ──────────────────────────────────────────────────────────────────
 
 async function cmdDaemon(args: Record<string, string | boolean>): Promise<void> {
-  if (!args["graph"]) {
-    process.stdout.write(`
-Usage: backpack-connector daemon [options]
-
-Required:
-  --graph <name>          Graph to watch (repeat for multiple graphs)
-  [multiple graphs not yet supported — pass comma-separated: --graph graph-a,graph-b]
-
-Optional:
-  --backpack-path <path>  Backpack directory (uses active backpack if omitted)
-  --database <name>       Override database name
-  --adapter <name>        Adapter (default: arcadedb)
-  --poll <ms>             Poll interval in milliseconds (default: 1000)
-`);
-    process.exit(1);
-  }
-
   const adapter = adapterArg(args);
   const backpackPath = await resolveBackpackPath(args);
-  const graphs = String(args["graph"]).split(",").map((g) => g.trim());
   const pollMs = args["poll"] ? parseInt(String(args["poll"]), 10) : 1000;
 
-  process.stderr.write(
-    `Daemon watching ${graphs.join(", ")} (${adapter.name}, polling every ${pollMs}ms)\n`,
-  );
+  if (args["graph"]) {
+    const graphs = String(args["graph"]).split(",").map((g) => g.trim()).filter(Boolean);
+    process.stderr.write(`Daemon watching ${graphs.join(", ")} (${adapter.name})\n`);
+    await runDaemon({
+      adapter,
+      targets: graphs.map((graph) => ({ backpackPath, graph, database: str(args["database"]) })),
+      pollMs,
+      onSync: (graph, count) => process.stderr.write(`Synced ${count} events for "${graph}"\n`),
+      onError: (graph, err) => process.stderr.write(`Error syncing "${graph}": ${err.message}\n`),
+    });
+  } else {
+    await runAutoDaemon(adapter, backpackPath, pollMs);
+  }
+}
 
-  await runDaemon({
-    adapter,
-    targets: graphs.map((graph) => ({
+async function cmdDaemonInstall(args: Record<string, string | boolean>): Promise<void> {
+  const backpackPath = await resolveBackpackPath(args);
+  try {
+    const dest = await installDaemon({
       backpackPath,
-      graph,
-      database: str(args["database"]),
-    })),
-    pollMs,
-    onSync: (graph, count) => process.stderr.write(`Synced ${count} events for "${graph}"\n`),
-    onError: (graph, err) => process.stderr.write(`Error syncing "${graph}": ${err.message}\n`),
-  });
+      adapterEnv: {
+        ...(args["url"]      ? { ARCADEDB_URL:      String(args["url"])      } : {}),
+        ...(args["username"] ? { ARCADEDB_USERNAME: String(args["username"]) } : {}),
+        ...(args["password"] ? { ARCADEDB_PASSWORD: String(args["password"]) } : {}),
+      },
+    });
+    process.stdout.write(`Daemon installed and started\n`);
+    process.stdout.write(`  Plist: ${dest}\n`);
+    process.stdout.write(`  Logs:  tail -f /tmp/backpack-connector-daemon.log\n`);
+    process.stdout.write(`  Stop:  backpack-connector daemon-uninstall\n`);
+  } catch (e) {
+    process.stderr.write(`Error: ${e instanceof Error ? e.message : String(e)}\n`);
+    process.exit(1);
+  }
+}
+
+async function cmdDaemonUninstall(): Promise<void> {
+  await uninstallDaemon();
+  process.stdout.write("Daemon stopped and uninstalled\n");
+}
+
+async function cmdDaemonStatus(): Promise<void> {
+  const status = await daemonStatus();
+  if (!status.installed) {
+    process.stdout.write("Daemon not installed. Run: backpack-connector daemon-install\n");
+  } else {
+    process.stdout.write(`Daemon: ${status.running ? "running ✓" : "installed but not running"}\n`);
+    process.stdout.write(`Logs:   tail -f ${status.logPath}\n`);
+  }
 }
 
 // ─── synthesize ──────────────────────────────────────────────────────────────
@@ -415,7 +432,10 @@ Commands:
   signals             Detect entities appearing in multiple graphs
   query               Run Cypher or SQL against a projected graph
   schema              Show schema for a projected graph
-  daemon              Watch for new events and project them continuously
+  daemon              Watch all graphs and project continuously (no --graph = auto-detect all)
+  daemon-install      Install daemon as a macOS login service (starts on login)
+  daemon-uninstall    Stop and remove the login service
+  daemon-status       Check if daemon is installed and running
   install-extension   Install the Query panel into the Backpack viewer
   mcp-config          Print Claude MCP server configuration
 
@@ -431,7 +451,10 @@ async function main(): Promise<void> {
     case "project":    return cmdProject(args);
     case "query":      return cmdQuery(args);
     case "schema":     return cmdSchema(args);
-    case "daemon":     return cmdDaemon(args);
+    case "daemon":          return cmdDaemon(args);
+    case "daemon-install":  return cmdDaemonInstall(args);
+    case "daemon-uninstall":return cmdDaemonUninstall();
+    case "daemon-status":   return cmdDaemonStatus();
     case "synthesize":        return cmdSynthesize(args);
     case "signals":           return cmdSignals(args);
     case "install-extension": return cmdInstallExtension();
