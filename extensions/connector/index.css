@@ -249,3 +249,13 @@
   background: var(--text-dim);
   box-shadow: none;
 }
+
+.cq-select {
+  cursor: pointer;
+  appearance: auto;
+}
+
+.cq-select option {
+  background: var(--bg-inset);
+  color: var(--text);
+}

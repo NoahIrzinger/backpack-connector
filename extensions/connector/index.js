@@ -110,10 +110,46 @@ export async function activate(api) {
     sql: "SELECT name, bk_type, bk_graph FROM Platform LIMIT 20",
   };
 
+  const TEMPLATES = [
+    { label: "— Templates —", query: "" },
+    { label: "Most connected entities", query: "MATCH (n)-[r]-()\nWHERE n.bk_id IS NOT NULL\nWITH n, count(r) AS degree\nWHERE degree > 1\nRETURN n.name, n.bk_type, degree\nORDER BY degree DESC LIMIT 15" },
+    { label: "Entities with no relationships", query: "MATCH (n)\nWHERE n.bk_id IS NOT NULL\nAND NOT (n)--()\nRETURN n.name, n.bk_type" },
+    { label: "All relationship types", query: "MATCH ()-[r]-()\nRETURN DISTINCT type(r) AS rel, count(r) AS count\nORDER BY count DESC" },
+    { label: "Nodes by type", query: "MATCH (n)\nWHERE n.bk_id IS NOT NULL\nRETURN n.bk_type AS type, count(n) AS count\nORDER BY count DESC" },
+    { label: "Most recent nodes", query: "MATCH (n)\nWHERE n.bk_id IS NOT NULL\nRETURN n.name, n.bk_type, n.bk_created_at\nORDER BY n.bk_created_at DESC LIMIT 15" },
+    { label: "Cross-graph duplicates", query: "MATCH (a), (b)\nWHERE a.bk_id <> b.bk_id\nAND toLower(a.name) = toLower(b.name)\nAND a.bk_graph <> b.bk_graph\nRETURN a.name, a.bk_type, a.bk_graph, b.bk_type, b.bk_graph\nLIMIT 20" },
+    { label: "Connections between two entities", query: "MATCH path = (a)-[*1..3]-(b)\nWHERE a.name CONTAINS 'EntityA'\nAND b.name CONTAINS 'EntityB'\nRETURN path LIMIT 5" },
+    { label: "Everything connected to a node", query: "MATCH (n)-[r]-(m)\nWHERE n.name CONTAINS 'search term'\nRETURN n.name, type(r), m.name, m.bk_type LIMIT 30" },
+  ];
+
   const langRow = makeLangRow((lang) => {
     textarea.placeholder = PLACEHOLDERS[lang] ?? PLACEHOLDERS.opencypher;
   });
-  queryFields.append(dbField.row, langRow);
+
+  // Template selector
+  const templateRow = document.createElement("div");
+  templateRow.className = "cq-field";
+  const templateLabel = document.createElement("label");
+  templateLabel.className = "cq-label";
+  templateLabel.textContent = "Template";
+  const templateSelect = document.createElement("select");
+  templateSelect.className = "cq-input cq-select";
+  for (const t of TEMPLATES) {
+    const opt = document.createElement("option");
+    opt.value = t.query;
+    opt.textContent = t.label;
+    templateSelect.appendChild(opt);
+  }
+  templateSelect.addEventListener("change", () => {
+    if (templateSelect.value) {
+      textarea.value = templateSelect.value;
+      templateSelect.selectedIndex = 0;
+      textarea.focus();
+    }
+  });
+  templateRow.append(templateLabel, templateSelect);
+
+  queryFields.append(dbField.row, langRow, templateRow);
 
   const textareaWrap = document.createElement("div");
   textareaWrap.className = "cq-textarea-wrap";
