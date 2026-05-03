@@ -70,6 +70,7 @@ export async function activate(api) {
     connStatus.textContent = "Testing…";
     try {
       const res = await apiFetch(`${url}/api/v1/ready`, {
+        method: "GET",
         headers: { "Authorization": basicAuth(user, pass) },
       });
       if (res.ok) {
@@ -420,6 +421,7 @@ export async function activate(api) {
 
   async function probeConnection() {
     const connected = await apiFetch(`${cfg.url}/api/v1/ready`, {
+      method: "GET",
       headers: { "Authorization": basicAuth(cfg.user, cfg.pass) },
     }).then(r => r.ok).catch(() => false);
 
