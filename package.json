@@ -1,6 +1,6 @@
 {
   "name": "backpack-connector",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Graph database projection connectors for Backpack learning graphs — unified MCP server, CLI, and adapter interface",
   "type": "module",
   "license": "Apache-2.0",
