@@ -21,6 +21,7 @@ function makeAdapter(opts: { exists?: boolean; lastOrdinal?: number } = {}) {
     databaseExists: vi.fn().mockResolvedValue(opts.exists ?? false),
     createDatabase: vi.fn().mockResolvedValue(undefined),
     dropDatabase: vi.fn().mockResolvedValue(undefined),
+    resetGraph: vi.fn().mockResolvedValue(undefined),
     bootstrapSchema: vi.fn().mockResolvedValue(undefined),
     getLastOrdinal: vi.fn().mockResolvedValue(opts.lastOrdinal ?? 0),
     setLastOrdinal: vi.fn().mockResolvedValue(undefined),
@@ -74,11 +75,11 @@ describe("project", () => {
     expect(result.eventsProcessed).toBe(1);
   });
 
-  it("reset drops the database and projects all events from scratch", async () => {
+  it("reset deletes only this graph's nodes (not entire shared database) and projects fresh", async () => {
     const adapter = makeAdapter({ exists: true, lastOrdinal: 3 });
     const result = await project(adapter, { backpackPath: tmpDir, graph: "test-graph", reset: true });
-    expect(adapter.dropDatabase).toHaveBeenCalledOnce();
-    expect(adapter.createDatabase).toHaveBeenCalledOnce();
+    expect(adapter.resetGraph).toHaveBeenCalledOnce();
+    expect(adapter.dropDatabase).not.toHaveBeenCalled();
     expect(adapter.applyEvent).toHaveBeenCalledTimes(3);
     expect(result.eventsProcessed).toBe(3);
   });
@@ -90,10 +91,10 @@ describe("project", () => {
     ).rejects.toThrow("Events file not found");
   });
 
-  it("derives database name from graph name by default", async () => {
+  it("uses 'backpack' as the default database (all graphs share one db)", async () => {
     const adapter = makeAdapter();
     const result = await project(adapter, { backpackPath: tmpDir, graph: "test-graph" });
-    expect(result.database).toBe("test_graph");
+    expect(result.database).toBe("backpack");
   });
 
   it("uses provided database name override", async () => {
@@ -101,5 +102,11 @@ describe("project", () => {
     const result = await project(adapter, { backpackPath: tmpDir, graph: "test-graph", database: "custom_db" });
     expect(result.database).toBe("custom_db");
     expect(adapter.createDatabase).toHaveBeenCalledWith("custom_db");
+  });
+
+  it("includes backpackName derived from path in result", async () => {
+    const adapter = makeAdapter();
+    const result = await project(adapter, { backpackPath: tmpDir, graph: "test-graph" });
+    expect(result.backpackName).toBeTruthy();
   });
 });

@@ -3,7 +3,7 @@ import { Backpack, EventSourcedBackend, SignalStore } from "backpack-ontology";
 import type { Signal, SignalSeverity, GlobalSignalConfig } from "backpack-ontology/connector";
 import { signalConfigFile } from "backpack-ontology/connector";
 import type { ConnectorAdapter } from "./adapter.js";
-import { sanitizeDatabaseName } from "./database-name.js";
+import { DEFAULT_DATABASE } from "./database-name.js";
 
 export interface ConnectorSignalResult {
   detected: number;
@@ -309,25 +309,18 @@ export async function runConnectorSignals(
   const backend = new EventSourcedBackend(undefined, { graphsDirOverride: backpackPath });
   const backpack = new Backpack(backend);
   await backpack.initialize();
-  const graphs = await backpack.listOntologies();
-  const databases = (
-    await Promise.all(
-      graphs.map(async (g) => {
-        const db = sanitizeDatabaseName(g.name);
-        return (await adapter.databaseExists(db)) ? db : null;
-      })
-    )
-  ).filter((db): db is string => db !== null);
+  const database = DEFAULT_DATABASE;
 
-  if (databases.length === 0) {
+  if (!(await adapter.databaseExists(database))) {
     return { detected: 0, signals: [] };
   }
 
+  // All graphs live in the single backpack database — pass it as the only database
   const results = await Promise.allSettled([
-    detectTypeDrift(adapter, databases, cfg),
-    detectCentralityHub(adapter, databases, cfg),
-    detectCommunityBridge(adapter, databases, cfg),
-    detectCrossGraphStructural(adapter, databases, cfg),
+    detectTypeDrift(adapter, [database], cfg),
+    detectCentralityHub(adapter, [database], cfg),
+    detectCommunityBridge(adapter, [database], cfg),
+    detectCrossGraphStructural(adapter, [database], cfg),
     runUserDefinedDetectors(adapter, cfg),
   ]);
 

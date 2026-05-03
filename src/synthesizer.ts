@@ -2,7 +2,7 @@ import { Backpack } from "backpack-ontology";
 import type { Node, Edge, LearningGraphData } from "backpack-ontology/connector";
 import type { ConnectorAdapter } from "./adapter.js";
 import { project } from "./projector.js";
-import { sanitizeDatabaseName } from "./database-name.js";
+import { DEFAULT_DATABASE } from "./database-name.js";
 
 export interface SynthesizeOptions {
   backpackPath: string;
@@ -37,12 +37,15 @@ function rowToNode(row: Record<string, unknown>): Node | null {
   const updatedAt = String(row.bk_updated_at ?? new Date().toISOString());
 
   const properties: Record<string, unknown> = {};
+  // User-defined properties FIRST so viewer label extraction (first string value)
+  // picks up "name" not "bk_graph".
   for (const [k, v] of Object.entries(row)) {
     if (k.startsWith("@") || k.startsWith("_")) continue;
-    if (k === "bk_graph" || k === "bk_branch") { properties[k] = v; continue; }
     if (k.startsWith("bk_")) continue;
     if (v !== null && v !== undefined) properties[k] = v;
   }
+  // bk_graph appended after so it's never picked as the label
+  if (row.bk_graph) properties.bk_graph = row.bk_graph;
 
   return { id: bkId, type, properties, createdAt, updatedAt };
 }
@@ -70,8 +73,11 @@ function rowToEdge(row: Record<string, unknown>): Edge | null {
   };
 }
 
-async function queryVertices(adapter: ConnectorAdapter, database: string, filter?: string): Promise<Node[]> {
-  const where = filter ? `n.bk_id IS NOT NULL AND (${filter})` : "n.bk_id IS NOT NULL";
+async function queryVertices(adapter: ConnectorAdapter, database: string, filter?: string, graphFilter?: string): Promise<Node[]> {
+  const base = "n.bk_id IS NOT NULL";
+  const filterPart = filter ? ` AND (${filter})` : "";
+  const graphPart = graphFilter ? ` ${graphFilter}` : "";
+  const where = `${base}${filterPart}${graphPart}`;
   const rows = await adapter.execute(database, "opencypher", `MATCH (n) WHERE ${where} RETURN n`);
   return rows.flatMap((r) => {
     const node = rowToNode((r.n ?? r) as Record<string, unknown>);
@@ -113,18 +119,22 @@ export async function synthesize(
   const allNodes = new Map<string, Node>();
   const allEdges = new Map<string, Edge>();
 
-  for (const graph of options.graphs) {
-    const database = sanitizeDatabaseName(graph);
-    if (!(await adapter.databaseExists(database))) {
-      onProgress?.(`Skipping "${graph}" — not projected yet`);
-      continue;
-    }
-    onProgress?.(`Reading "${graph}" from ${adapter.name}...`);
-    for (const node of await queryVertices(adapter, database, options.filter)) allNodes.set(node.id, node);
-    for (const edge of await queryEdges(adapter, database)) {
-      if (allNodes.has(edge.sourceId) && allNodes.has(edge.targetId)) {
-        allEdges.set(edge.id, edge);
-      }
+  const database = DEFAULT_DATABASE;
+  if (!(await adapter.databaseExists(database))) {
+    onProgress?.(`No projected graphs found — run connector project first`);
+    return { outputGraph: options.into, nodeCount: 0, edgeCount: 0, sourceGraphs: options.graphs, durationMs: Date.now() - start, viewerUrl: `http://localhost:5173#${options.into}` };
+  }
+
+  // All graphs live in one database. Filter by graph names when specified.
+  const graphFilter = options.graphs.length > 0
+    ? `AND n.bk_graph IN [${options.graphs.map(g => `'${g}'`).join(", ")}]`
+    : "";
+
+  onProgress?.(`Reading from ${adapter.name} (${database})...`);
+  for (const node of await queryVertices(adapter, database, options.filter, graphFilter)) allNodes.set(node.id, node);
+  for (const edge of await queryEdges(adapter, database)) {
+    if (allNodes.has(edge.sourceId) && allNodes.has(edge.targetId)) {
+      allEdges.set(edge.id, edge);
     }
   }
 

@@ -1,6 +1,6 @@
 import { Backpack } from "backpack-ontology";
 import type { ConnectorAdapter } from "./adapter.js";
-import { sanitizeDatabaseName } from "./database-name.js";
+import { DEFAULT_DATABASE } from "./database-name.js";
 
 export interface CrossGraphEntity {
   label: string;
@@ -45,7 +45,7 @@ export async function detectCrossGraphSignals(
     const summaries = await backpack.listOntologies();
     const projected: string[] = [];
     for (const s of summaries) {
-      if (await adapter.databaseExists(sanitizeDatabaseName(s.name))) {
+      if (await adapter.databaseExists(DEFAULT_DATABASE)) {
         projected.push(s.name);
       }
     }
@@ -66,13 +66,16 @@ export async function detectCrossGraphSignals(
     Map<string, Array<{ bkId: string; type: string; label: string; properties: Record<string, unknown> }>>
   >();
 
-  for (const graph of graphs) {
-    const database = sanitizeDatabaseName(graph);
-    if (!(await adapter.databaseExists(database))) continue;
+  // All graphs live in the single backpack database — query once, filter by bk_graph
+  const database = DEFAULT_DATABASE;
+  if (!(await adapter.databaseExists(database))) {
+    return { analyzedGraphs: graphs, duplicateEntities: [], totalDuplicates: 0, summary: "No projected graphs found — run connector project first." };
+  }
 
+  for (const graph of graphs) {
     let rows: Record<string, unknown>[];
     try {
-      const raw = await adapter.execute(database, "opencypher", "MATCH (n) WHERE n.bk_id IS NOT NULL RETURN n");
+      const raw = await adapter.execute(database, "opencypher", `MATCH (n) WHERE n.bk_id IS NOT NULL AND n.bk_graph = '${graph}' RETURN n`);
       rows = raw.map((r) => (r.n ?? r) as Record<string, unknown>);
     } catch {
       continue;

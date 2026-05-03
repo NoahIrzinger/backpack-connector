@@ -35,7 +35,7 @@ describe("synthesize filter", () => {
     await synthesize(adapter, { backpackPath: "/fake", graphs: ["g"], into: "out", projectFirst: false });
     const nodeQuery = adapter.execute.mock.calls.find(c => String(c[2]).includes("MATCH (n)"));
     expect(nodeQuery).toBeTruthy();
-    expect(nodeQuery![2]).toBe("MATCH (n) WHERE n.bk_id IS NOT NULL RETURN n");
+    expect(nodeQuery![2]).toContain("MATCH (n) WHERE n.bk_id IS NOT NULL");
   });
 
   it("with filter appends AND clause to node query", async () => {
@@ -45,7 +45,7 @@ describe("synthesize filter", () => {
       filter: "n:Platform OR n:API", projectFirst: false,
     });
     const nodeQuery = adapter.execute.mock.calls.find(c => String(c[2]).includes("MATCH (n)"));
-    expect(nodeQuery![2]).toBe("MATCH (n) WHERE n.bk_id IS NOT NULL AND (n:Platform OR n:API) RETURN n");
+    expect(nodeQuery![2]).toContain("AND (n:Platform OR n:API)");
   });
 
   it("writes output graph via createOntologyFromData", async () => {

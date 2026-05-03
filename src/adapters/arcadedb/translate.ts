@@ -8,6 +8,7 @@ export interface SqlCmd {
 
 function buildUpsert(typeName: string, bkId: string, props: Record<string, unknown>): SqlCmd {
   // w_bk_id is the WHERE condition — separate param so a node property
+  // named "bk_id" can't overwrite it through the p_ loop below.
   const params: Record<string, unknown> = { w_bk_id: bkId };
   const setParts: string[] = [];
   for (const [k, v] of Object.entries(props)) {
@@ -22,10 +23,11 @@ function buildUpsert(typeName: string, bkId: string, props: Record<string, unkno
   };
 }
 
-function nodeProps(node: Node, graph: string, branch: string): Record<string, unknown> {
+function nodeProps(node: Node, backpackName: string, graph: string, branch: string): Record<string, unknown> {
   const props: Record<string, unknown> = {
     bk_id: node.id,
     bk_type: node.type,
+    bk_backpack: backpackName,
     bk_graph: graph,
     bk_branch: branch,
     bk_created_at: node.createdAt,
@@ -37,10 +39,11 @@ function nodeProps(node: Node, graph: string, branch: string): Record<string, un
   return props;
 }
 
-function edgeProps(edge: Edge, graph: string, branch: string): Record<string, unknown> {
+function edgeProps(edge: Edge, backpackName: string, graph: string, branch: string): Record<string, unknown> {
   const props: Record<string, unknown> = {
     bk_id: edge.id,
     bk_type: edge.type,
+    bk_backpack: backpackName,
     bk_graph: graph,
     bk_branch: branch,
     bk_created_at: edge.createdAt,
@@ -52,14 +55,14 @@ function edgeProps(edge: Edge, graph: string, branch: string): Record<string, un
   return props;
 }
 
-export function translateNodeAdd(node: Node, graph: string, branch: string): SqlCmd {
-  return buildUpsert(sanitizeIdent(node.type), node.id, nodeProps(node, graph, branch));
+export function translateNodeAdd(node: Node, backpackName: string, graph: string, branch: string): SqlCmd {
+  return buildUpsert(sanitizeIdent(node.type), node.id, nodeProps(node, backpackName, graph, branch));
 }
 
-export function translateIndexUpsert(bkId: string, nodeTypeSafe: string): SqlCmd {
+export function translateIndexUpsert(bkId: string, nodeTypeSafe: string, backpackName: string): SqlCmd {
   return {
-    sql: "UPDATE BackpackIndex SET bk_id = :bk_id, node_type = :node_type UPSERT WHERE bk_id = :bk_id",
-    params: { bk_id: bkId, node_type: nodeTypeSafe },
+    sql: "UPDATE BackpackIndex SET bk_id = :bk_id, node_type = :node_type, bk_backpack = :backpack UPSERT WHERE bk_id = :bk_id AND bk_backpack = :backpack",
+    params: { bk_id: bkId, node_type: nodeTypeSafe, backpack: backpackName },
   };
 }
 
@@ -67,7 +70,7 @@ export function translateNodeUpdate(event: NodeUpdateEvent, typeSafe: string): S
   const params: Record<string, unknown> = { w_bk_id: event.id, p_bk_updated_at: event.ts };
   const setParts = ["bk_updated_at = :p_bk_updated_at"];
   for (const [k, v] of Object.entries(event.properties)) {
-    if (v === null) continue; // null = delete — skip in v1 (property deletion is a v2 feature)
+    if (v === null) continue;
     const paramName = `p_${sanitizeIdent(k)}`;
     setParts.push(`${sanitizeIdent(k)} = :${paramName}`);
     params[paramName] = typeof v === "object" ? JSON.stringify(v) : v;
@@ -89,10 +92,11 @@ export function translateEdgeAdd(
   edge: Edge,
   sourceTypeSafe: string,
   targetTypeSafe: string,
+  backpackName: string,
   graph: string,
   branch: string,
 ): SqlCmd[] {
-  const props = edgeProps(edge, graph, branch);
+  const props = edgeProps(edge, backpackName, graph, branch);
   const typeName = sanitizeIdent(edge.type);
   const params: Record<string, unknown> = {
     p_bk_id: edge.id,
@@ -119,9 +123,10 @@ export function translateEdgeRemove(event: EdgeRemoveEvent, typeSafe: string): S
   return { sql: `DELETE FROM ${typeSafe} WHERE bk_id = :bk_id`, params: { bk_id: event.id } };
 }
 
-export function translateNodeRetype(event: NodeRetypeEvent): SqlCmd {
+export function translateNodeRetype(event: NodeRetypeEvent, backpackName: string): SqlCmd {
   // The vertex itself stays in its original type bucket — full retype (delete+recreate)
-  return translateIndexUpsert(event.id, sanitizeIdent(event.type));
+  // is a v2 feature since it requires preserving all connected edges.
+  return translateIndexUpsert(event.id, sanitizeIdent(event.type), backpackName);
 }
 
 export type TranslateResult =
@@ -131,15 +136,15 @@ export type TranslateResult =
   | { kind: "needs-edge-type-lookup"; edgeId: string }
   | null;
 
-export function translateEvent(event: GraphEvent, graph: string, branch: string): TranslateResult {
+export function translateEvent(event: GraphEvent, backpackName: string, graph: string, branch: string): TranslateResult {
   switch (event.op) {
     case "node.add":
       return {
         kind: "cmds",
         nodeType: event.node.type,
         cmds: [
-          translateNodeAdd(event.node, graph, branch),
-          translateIndexUpsert(event.node.id, sanitizeIdent(event.node.type)),
+          translateNodeAdd(event.node, backpackName, graph, branch),
+          translateIndexUpsert(event.node.id, sanitizeIdent(event.node.type), backpackName),
         ],
       };
 
@@ -152,7 +157,7 @@ export function translateEvent(event: GraphEvent, graph: string, branch: string)
     case "node.retype":
       return {
         kind: "cmds",
-        cmds: [translateNodeRetype(event)],
+        cmds: [translateNodeRetype(event, backpackName)],
       };
 
     case "edge.add":
@@ -162,12 +167,7 @@ export function translateEvent(event: GraphEvent, graph: string, branch: string)
       return { kind: "needs-edge-type-lookup", edgeId: event.id };
 
     case "edge.retype":
-      // v1: not implemented — edge retype requires finding the edge, deleting and recreating with new type
       process.stderr.write(`Warning: edge.retype not implemented in v1 connector — skipping\n`);
-      return null;
-
-    case "metadata.update":
-    case "snapshot.label":
       return null;
 
     default:

@@ -29,15 +29,19 @@ export class SchemaManager {
   }
 
   async bootstrap(client: ArcadeDBClient, database: string): Promise<void> {
+    // BackpackState: tracks projection ordinal per backpack+graph+branch
     await tryCommand(client, database, "CREATE DOCUMENT TYPE BackpackState");
+    await tryCommand(client, database, "CREATE PROPERTY BackpackState.bk_backpack STRING");
     await tryCommand(client, database, "CREATE PROPERTY BackpackState.bk_graph STRING");
     await tryCommand(client, database, "CREATE PROPERTY BackpackState.bk_branch STRING");
-    await tryCommand(client, database, "CREATE INDEX ON BackpackState (bk_graph, bk_branch) UNIQUE");
+    await tryCommand(client, database, "CREATE INDEX ON BackpackState (bk_backpack, bk_graph, bk_branch) UNIQUE");
 
+    // BackpackIndex: maps bk_id → sanitized vertex type for edge creation lookups
     await tryCommand(client, database, "CREATE DOCUMENT TYPE BackpackIndex");
     await tryCommand(client, database, "CREATE PROPERTY BackpackIndex.bk_id STRING");
+    await tryCommand(client, database, "CREATE PROPERTY BackpackIndex.bk_backpack STRING");
     await tryCommand(client, database, "CREATE PROPERTY BackpackIndex.node_type STRING");
-    await tryCommand(client, database, "CREATE INDEX ON BackpackIndex (bk_id) UNIQUE");
+    await tryCommand(client, database, "CREATE INDEX ON BackpackIndex (bk_id, bk_backpack) UNIQUE");
   }
 
   async ensureVertexType(client: ArcadeDBClient, database: string, type: string): Promise<void> {

@@ -7,8 +7,8 @@ const DEFAULT_URL = "http://localhost:2480";
 const DEFAULT_USER = "root";
 const DEFAULT_PASS = "arcadedb";
 
-function deriveDatabase(graphName) {
-  return (graphName || "").replace(/[^a-zA-Z0-9_]/g, "_").toLowerCase();
+function deriveDatabase(_graphName) {
+  return "backpack";
 }
 
 function basicAuth(user, pass) {
@@ -102,7 +102,7 @@ export async function activate(api) {
   queryFields.className = "cq-section";
 
   const dbField = makeField("Database", "text", deriveDatabase(api.getGraphName()));
-  dbField.input.placeholder = "e.g. ms_teams_meeting_bot";
+  dbField.input.placeholder = "backpack";
   dbField.input.dataset.cq = "database";
 
   const PLACEHOLDERS = {
@@ -365,7 +365,55 @@ export async function activate(api) {
 
   let panel = null;
 
-  // --- Connection indicator ---
+  function applySection(openSettings) {
+    if (openSettings) {
+      settingsSection.hidden = false;
+      querySection.hidden = true;
+      urlField.input.value = cfg.url;
+      userField.input.value = cfg.user;
+      passField.input.value = cfg.pass;
+    } else {
+      settingsSection.hidden = true;
+      querySection.hidden = false;
+    }
+  }
+
+  function openPanel(openSettings) {
+    if (!panel) {
+      panel = api.mountPanel(root, {
+        title: "Graph Query",
+        defaultPosition: { left: 180, top: 80 },
+        headerButtons: [{
+          label: "Settings",
+          iconText: "⚙",
+          onClick() {
+            const showSettings = settingsSection.hidden;
+            settingsSection.hidden = !showSettings;
+            querySection.hidden = showSettings;
+            if (!settingsSection.hidden) {
+              urlField.input.value = cfg.url;
+              userField.input.value = cfg.user;
+              passField.input.value = cfg.pass;
+            }
+          },
+        }],
+        onClose() { panel = null; },
+      });
+      applySection(openSettings);
+    } else if (panel.isVisible()) {
+      panel.setVisible(false);
+    } else {
+      applySection(openSettings);
+      panel.setVisible(true);
+      panel.bringToFront();
+    }
+  }
+
+  window.addEventListener("backpack-kg-open", (e) => {
+    openPanel(e.detail?.openSettings ?? false);
+  });
+
+  // --- Connection indicator in KG section ---
 
   let connectionDot = null;
   let probeTimer = null;
@@ -382,57 +430,21 @@ export async function activate(api) {
   }
 
   function attachDot() {
-    const btn = Array.from(document.querySelectorAll("button"))
-      .find(b => b.textContent?.includes("Query") && b.textContent?.includes("⟨⟩"));
-    if (!btn) return false;
-    if (btn.querySelector(".cq-conn-dot")) return true;
+    const target = document.querySelector(".kg-conn-dot-target");
+    if (!target) return false;
+    if (target.querySelector(".cq-conn-dot")) return true;
     connectionDot = document.createElement("span");
     connectionDot.className = "cq-conn-dot cq-conn-dot--off";
     connectionDot.title = "ArcadeDB status unknown";
-    btn.appendChild(connectionDot);
+    target.appendChild(connectionDot);
     probeConnection();
     probeTimer = setInterval(probeConnection, 30000);
     return true;
   }
 
-  // Retry until button is in DOM (extension loads asynchronously)
+  // Retry until KG section is in DOM (extension loads asynchronously)
   const dotRetry = setInterval(() => { if (attachDot()) clearInterval(dotRetry); }, 200);
   setTimeout(() => clearInterval(dotRetry), 5000);
-
-  api.registerTaskbarIcon({
-    label: "Query",
-    iconText: "⟨⟩",
-    position: "top-right",
-    onClick() {
-      if (!panel) {
-        panel = api.mountPanel(root, {
-          title: "Graph Query",
-          defaultPosition: { left: 180, top: 80 },
-          headerButtons: [{
-            label: "Settings",
-            iconText: "⚙",
-            onClick() {
-              const showSettings = settingsSection.hidden;
-              settingsSection.hidden = !showSettings;
-              querySection.hidden = showSettings;
-              // Sync inputs from current config
-              if (!settingsSection.hidden) {
-                urlField.input.value = cfg.url;
-                userField.input.value = cfg.user;
-                passField.input.value = cfg.pass;
-              }
-            },
-          }],
-          onClose() { panel = null; },
-        });
-      } else if (panel.isVisible()) {
-        panel.setVisible(false);
-      } else {
-        panel.setVisible(true);
-        panel.bringToFront();
-      }
-    },
-  });
 
   // --- Helpers ---
 

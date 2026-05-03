@@ -5,7 +5,7 @@ import { getActiveBackpack } from "backpack-ontology/connector";
 import { createAdapter } from "../src/adapter-factory.js";
 import { project } from "../src/projector.js";
 import { runDaemon } from "../src/daemon.js";
-import { sanitizeDatabaseName } from "../src/database-name.js";
+import { sanitizeDatabaseName, DEFAULT_DATABASE } from "../src/database-name.js";
 import { synthesize } from "../src/synthesizer.js";
 import { detectCrossGraphSignals } from "../src/cross-graph-signals.js";
 import { runAutoDaemon, installDaemon, uninstallDaemon, daemonStatus } from "../src/auto-daemon.js";
@@ -113,7 +113,7 @@ async function cmdQuery(args: Record<string, string | boolean>): Promise<void> {
   const database = args["database"]
     ? String(args["database"])
     : args["graph"]
-    ? sanitizeDatabaseName(String(args["graph"]))
+    ? DEFAULT_DATABASE
     : null;
 
   const queryText = str(args["cypher"]) ?? str(args["sql"]);
@@ -164,7 +164,7 @@ async function cmdSchema(args: Record<string, string | boolean>): Promise<void> 
   const database = args["database"]
     ? String(args["database"])
     : args["graph"]
-    ? sanitizeDatabaseName(String(args["graph"]))
+    ? DEFAULT_DATABASE
     : null;
 
   if (!database) {

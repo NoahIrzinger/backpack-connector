@@ -22,10 +22,11 @@ export interface ConnectorAdapter {
   dropDatabase(database: string): Promise<void>;
   bootstrapSchema(database: string): Promise<void>;
 
-  getLastOrdinal(database: string, graph: string, branch: string): Promise<number>;
-  setLastOrdinal(database: string, graph: string, branch: string, ordinal: number): Promise<void>;
+  getLastOrdinal(database: string, backpackName: string, graph: string, branch: string): Promise<number>;
+  setLastOrdinal(database: string, backpackName: string, graph: string, branch: string, ordinal: number): Promise<void>;
 
-  applyEvent(event: GraphEvent, database: string, graph: string, branch: string): Promise<void>;
+  applyEvent(event: GraphEvent, database: string, backpackName: string, graph: string, branch: string): Promise<void>;
+  resetGraph(database: string, backpackName: string, graph: string, branch: string): Promise<void>;
 
   execute(database: string, language: string, query: string): Promise<Record<string, unknown>[]>;
   getSchema(database: string): Promise<ConnectorSchema>;

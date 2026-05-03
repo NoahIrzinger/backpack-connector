@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getActiveBackpack } from "backpack-ontology/connector";
 import type { ConnectorAdapter } from "../adapter.js";
 import { project } from "../projector.js";
-import { sanitizeDatabaseName } from "../database-name.js";
+import { sanitizeDatabaseName, DEFAULT_DATABASE, backpackNameFromPath } from "../database-name.js";
 import { synthesize } from "../synthesizer.js";
 import { detectCrossGraphSignals } from "../cross-graph-signals.js";
 import { runConnectorSignals } from "../connector-signals.js";
@@ -321,7 +321,8 @@ export function registerConnectorTools(server: McpServer, adapter: ConnectorAdap
     async ({ graph, backpackPath, database, branch }) => {
       try {
         const resolvedPath = await resolveBackpackPath(backpackPath);
-        const db = database ?? sanitizeDatabaseName(graph);
+        const backpackName = backpackNameFromPath(resolvedPath);
+        const db = database ?? DEFAULT_DATABASE;
         const br = branch ?? "main";
         const dbExists = await adapter.databaseExists(db);
         if (!dbExists) {
@@ -333,7 +334,7 @@ export function registerConnectorTools(server: McpServer, adapter: ConnectorAdap
           };
         }
         const schema = await adapter.getSchema(db);
-        const ordinal = await adapter.getLastOrdinal(db, graph, br);
+        const ordinal = await adapter.getLastOrdinal(db, backpackName, graph, br);
         const text =
           `Graph: ${graph} → database: ${db} (branch: ${br})\n` +
           `Last projected ordinal: ${ordinal}\n` +
