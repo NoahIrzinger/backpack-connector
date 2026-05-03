@@ -6,6 +6,11 @@ export interface SqlCmd {
   params?: Record<string, unknown>;
 }
 
+// Backtick-quote a SQL column identifier to protect reserved words (e.g. trigger, order, select).
+function q(ident: string): string {
+  return `\`${ident}\``;
+}
+
 function buildUpsert(typeName: string, bkId: string, props: Record<string, unknown>): SqlCmd {
   // w_bk_id is the WHERE condition — separate param so a node property
   // named "bk_id" can't overwrite it through the p_ loop below.
@@ -14,7 +19,7 @@ function buildUpsert(typeName: string, bkId: string, props: Record<string, unkno
   for (const [k, v] of Object.entries(props)) {
     if (v === null || v === undefined) continue;
     const paramName = `p_${k}`;
-    setParts.push(`${k} = :${paramName}`);
+    setParts.push(`${q(k)} = :${paramName}`);
     params[paramName] = typeof v === "object" ? JSON.stringify(v) : v;
   }
   return {
@@ -68,11 +73,11 @@ export function translateIndexUpsert(bkId: string, nodeTypeSafe: string, backpac
 
 export function translateNodeUpdate(event: NodeUpdateEvent, typeSafe: string): SqlCmd {
   const params: Record<string, unknown> = { w_bk_id: event.id, p_bk_updated_at: event.ts };
-  const setParts = ["bk_updated_at = :p_bk_updated_at"];
+  const setParts = [`${q("bk_updated_at")} = :p_bk_updated_at`];
   for (const [k, v] of Object.entries(event.properties)) {
     if (v === null) continue;
     const paramName = `p_${sanitizeIdent(k)}`;
-    setParts.push(`${sanitizeIdent(k)} = :${paramName}`);
+    setParts.push(`${q(sanitizeIdent(k))} = :${paramName}`);
     params[paramName] = typeof v === "object" ? JSON.stringify(v) : v;
   }
   return {
@@ -107,7 +112,7 @@ export function translateEdgeAdd(
   for (const [k, v] of Object.entries(props)) {
     if (v === null || v === undefined) continue;
     const paramName = `p_${k}`;
-    setParts.push(`${k} = :${paramName}`);
+    setParts.push(`${q(k)} = :${paramName}`);
     params[paramName] = typeof v === "object" ? JSON.stringify(v) : v;
   }
   return [

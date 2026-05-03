@@ -58,7 +58,7 @@ describe("translateNodeAdd", () => {
   it("sanitizes property keys", () => {
     const nodeWithSpace = { ...node, properties: { "bad key": "value" } };
     const cmd = translateNodeAdd(nodeWithSpace, "bp", "g", "main");
-    expect(cmd.sql).toContain("bad_key = :p_bad_key");
+    expect(cmd.sql).toContain("`bad_key` = :p_bad_key");
   });
 
   it("w_bk_id is separate from p_bk_id so property named bk_id cannot overwrite WHERE param", () => {

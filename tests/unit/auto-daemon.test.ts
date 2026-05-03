@@ -70,7 +70,7 @@ describe("plist generation", () => {
     }
     expect(content).toContain(process.execPath);
     expect(content).toContain("dist/bin/cli.js");
-    expect(content).toContain("daemon --backpack-path");
+    expect(content).toContain("daemon --all-backpacks");
     expect(content).toContain("ARCADEDB_URL");
     expect(content).toContain("KeepAlive");
     expect(content).toContain("RunAtLoad");
