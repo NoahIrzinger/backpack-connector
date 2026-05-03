@@ -329,6 +329,40 @@ export async function activate(api) {
 
   let panel = null;
 
+  // --- Connection indicator ---
+
+  let connectionDot = null;
+  let probeTimer = null;
+
+  async function probeConnection() {
+    const connected = await apiFetch(`${cfg.url}/api/v1/ready`, {
+      headers: { "Authorization": basicAuth(cfg.user, cfg.pass) },
+    }).then(r => r.ok).catch(() => false);
+
+    if (connectionDot) {
+      connectionDot.className = `cq-conn-dot ${connected ? "cq-conn-dot--on" : "cq-conn-dot--off"}`;
+      connectionDot.title = connected ? `ArcadeDB connected (${cfg.url})` : "ArcadeDB not reachable";
+    }
+  }
+
+  function attachDot() {
+    const btn = Array.from(document.querySelectorAll("button"))
+      .find(b => b.textContent?.includes("Query") && b.textContent?.includes("⟨⟩"));
+    if (!btn) return false;
+    if (btn.querySelector(".cq-conn-dot")) return true;
+    connectionDot = document.createElement("span");
+    connectionDot.className = "cq-conn-dot cq-conn-dot--off";
+    connectionDot.title = "ArcadeDB status unknown";
+    btn.appendChild(connectionDot);
+    probeConnection();
+    probeTimer = setInterval(probeConnection, 30000);
+    return true;
+  }
+
+  // Retry until button is in DOM (extension loads asynchronously)
+  const dotRetry = setInterval(() => { if (attachDot()) clearInterval(dotRetry); }, 200);
+  setTimeout(() => clearInterval(dotRetry), 5000);
+
   api.registerTaskbarIcon({
     label: "Query",
     iconText: "⟨⟩",

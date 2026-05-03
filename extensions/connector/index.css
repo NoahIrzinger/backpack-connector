@@ -228,3 +228,24 @@
 .cq-conn-testing {
   color: var(--text-muted);
 }
+
+.cq-conn-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-left: 5px;
+  vertical-align: middle;
+  flex-shrink: 0;
+  transition: background 0.4s, box-shadow 0.4s;
+}
+
+.cq-conn-dot--on {
+  background: var(--accent);
+  box-shadow: 0 0 5px var(--accent);
+}
+
+.cq-conn-dot--off {
+  background: var(--text-dim);
+  box-shadow: none;
+}
