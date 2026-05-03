@@ -126,8 +126,9 @@ export async function synthesize(
   }
 
   // All graphs live in one database. Filter by graph names when specified.
+  const esc = (s: string) => s.replace(/'/g, "\\'");
   const graphFilter = options.graphs.length > 0
-    ? `AND n.bk_graph IN [${options.graphs.map(g => `'${g}'`).join(", ")}]`
+    ? `AND n.bk_graph IN [${options.graphs.map(g => `'${esc(g)}'`).join(", ")}]`
     : "";
 
   onProgress?.(`Reading from ${adapter.name} (${database})...`);

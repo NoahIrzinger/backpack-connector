@@ -75,7 +75,8 @@ export async function detectCrossGraphSignals(
   for (const graph of graphs) {
     let rows: Record<string, unknown>[];
     try {
-      const raw = await adapter.execute(database, "opencypher", `MATCH (n) WHERE n.bk_id IS NOT NULL AND n.bk_graph = '${graph}' RETURN n`);
+      const esc = (s: string) => s.replace(/'/g, "\\'");
+      const raw = await adapter.execute(database, "opencypher", `MATCH (n) WHERE n.bk_id IS NOT NULL AND n.bk_graph = '${esc(graph)}' RETURN n`);
       rows = raw.map((r) => (r.n ?? r) as Record<string, unknown>);
     } catch {
       continue;
